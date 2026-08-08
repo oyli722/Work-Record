@@ -43,13 +43,9 @@ export default function App() {
           {ping === null ? (
             <p className="app__ping app__ping--pending">fs:ping …</p>
           ) : ping.ok ? (
-            <p className="app__ping app__ping--ok">
-              fs:ping 连通 ✓（{ping.pong}）
-            </p>
+            <p className="app__ping app__ping--ok">fs:ping 连通 ✓（{ping.pong}）</p>
           ) : (
-            <p className="app__ping app__ping--err">
-              fs:ping 失败：{ping.error}
-            </p>
+            <p className="app__ping app__ping--err">fs:ping 失败：{ping.error}</p>
           )}
         </div>
       </main>

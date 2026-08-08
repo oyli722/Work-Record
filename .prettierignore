@@ -1,0 +1,12 @@
+node_modules
+out
+dist
+release
+package-lock.json
+
+# 中文文档手工排版，不交由 Prettier 重排
+进度看板.md
+开发计划.md
+需求规格文档.md
+CLAUDE.md
+README.md

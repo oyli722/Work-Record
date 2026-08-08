@@ -54,8 +54,9 @@
 
   /* ---- 字体 ---- */
   /* PRD §3.4.3：系统字体栈优先，跨平台备选 Inter / 思源黑体；阶段 6 提供三选切换 */
-  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
-    Inter, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
   --font-mono: 'SF Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
 
   /* ---- 尺寸 ---- */
