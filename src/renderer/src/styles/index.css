@@ -1,12 +1,6 @@
 /* MeWork 全局样式（阶段 1 骨架）
-   主题 token 体系于 1.4 子阶段引入（颜色 / 间距 / 圆角 / 阴影 / 字体）。
-   此处仅提供骨架所需的最小布局，避免提前写死颜色。 */
-
-:root {
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-  line-height: 1.5;
-  color-scheme: light dark;
-}
+   全部颜色 / 阴影 / 字体经 tokens.css 的 CSS 变量驱动（PRD §4.6.3，无硬编码）。
+   布局遵循 Apple 风格：克制留白、柔和阴影、圆角（§3.4）。 */
 
 * {
   box-sizing: border-box;
@@ -23,6 +17,11 @@ body,
 body {
   overflow: hidden;
   user-select: none;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  background: var(--color-bg);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .app {
@@ -31,20 +30,48 @@ body {
   height: 100%;
 }
 
+/* ---- 顶栏 ---- */
 .app__topbar {
   flex: 0 0 auto;
-  height: 44px;
+  height: var(--topbar-height);
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-sm);
+  z-index: 1;
+}
+
+.app__title {
   font-weight: 600;
 }
 
+.app__theme-toggle {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.app__theme-toggle:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+/* ---- 内容区 ---- */
 .app__content {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--space-5);
 }
 
 .app__hint {
@@ -55,11 +82,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .app__ping {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 
 .app__ping--pending {
@@ -67,9 +94,9 @@ body {
 }
 
 .app__ping--ok {
-  color: #2ea043;
+  color: var(--color-success);
 }
 
 .app__ping--err {
-  color: #d1242f;
+  color: var(--color-danger);
 }
