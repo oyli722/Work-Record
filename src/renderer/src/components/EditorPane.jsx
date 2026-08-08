@@ -11,6 +11,7 @@ const MAX_RATIO = 85
 
 export default function EditorPane({ editor, theme }) {
   const { currentFile, content, saveState, dirty, error, loading, setContent, save } = editor
+  const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   const [mode, setMode] = useState('split') // split | edit | preview
   const [ratio, setRatio] = useState(50) // 分屏比例（编辑区宽度 %）
   const bodyRef = useRef(null)
@@ -93,7 +94,7 @@ export default function EditorPane({ editor, theme }) {
           <div className="editor__body" ref={bodyRef}>
             {mode === 'preview' ? (
               <div className="editor__pane editor__pane--preview editor__pane--full">
-                <PreviewPane content={content} />
+                <PreviewPane content={content} isMarkdown={isMarkdown} />
               </div>
             ) : (
               <div
@@ -113,7 +114,7 @@ export default function EditorPane({ editor, theme }) {
                   title="拖拽调整分屏比例"
                 />
                 <div className="editor__pane editor__pane--preview">
-                  <PreviewPane content={content} />
+                  <PreviewPane content={content} isMarkdown={isMarkdown} />
                 </div>
               </>
             )}

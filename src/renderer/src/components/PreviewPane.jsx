@@ -1,9 +1,24 @@
-// 预览区（阶段 3.2 占位：纯文本呈现，暖纸阅读面）
-// markdown-it + DOMPurify 渲染随 3.4 落地，届时替换为 <div className="markdown-body">。
-export default function PreviewPane({ content }) {
+// 预览区（阶段 3.4：markdown-it + DOMPurify 渲染，暖纸阅读面）
+// isMarkdown=false（TXT）退化为纯文本 pre 呈现。图片加载（相对/远程）随 3.5，外链随 3.6。
+import { useMemo } from 'react'
+import { renderMarkdown } from '../utils/markdown'
+
+export default function PreviewPane({ content, isMarkdown }) {
+  const html = useMemo(
+    () => (isMarkdown ? renderMarkdown(content) : ''),
+    [content, isMarkdown]
+  )
+
+  if (!isMarkdown) {
+    return (
+      <div className="preview">
+        <pre className="preview__text">{content}</pre>
+      </div>
+    )
+  }
   return (
     <div className="preview">
-      <pre className="preview__text">{content}</pre>
+      <div className="preview__md" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   )
 }
