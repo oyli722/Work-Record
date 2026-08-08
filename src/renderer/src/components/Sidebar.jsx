@@ -33,10 +33,10 @@ export default function Sidebar({ workspace }) {
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          title={workspace.activePath}
+          title={workspace.activePath ?? '未选择工作区'}
         >
-          <span className="sidebar__ws-name" title={workspace.activePath}>
-            {workspace.activePath}
+          <span className="sidebar__ws-name" title={workspace.activePath ?? ''}>
+            {workspace.activePath ?? '未选择工作区'}
           </span>
           <span className="sidebar__ws-caret" aria-hidden="true">
             ▾

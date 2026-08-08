@@ -268,57 +268,34 @@ button {
   padding: var(--space-2);
 }
 
-/* ============ 首次引导（暖纸书桌空状态） ============ */
+/* ============ 主内容区空状态（无工作区） ============ */
 
-.onboarding {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  /* 整页暖纸底色：无工作区时即「书桌摊开的纸面」，与工作区冷灰外壳对比 */
-  background: var(--color-paper);
-  color: var(--color-paper-text);
-  transition: background-color 0.2s ease;
-}
-
-.onboarding__inner {
+.workspace-empty {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
-  gap: var(--space-4);
-  max-width: 400px;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  color: var(--color-text);
 }
 
-/* 线性图标：强调色、克制描边 */
-.onboarding__icon {
-  color: var(--color-accent);
-  opacity: 0.9;
-  margin-bottom: var(--space-2);
-}
-
-.onboarding__eyebrow {
-  font-size: var(--font-size-sm);
+.workspace-empty__title {
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-accent);
+  letter-spacing: -0.01em;
 }
 
-.onboarding__title {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.onboarding__desc {
+.workspace-empty__desc {
   font-size: var(--font-size-base);
-  color: var(--color-paper-text-secondary);
-  line-height: 1.7;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  max-width: 380px;
 }
 
-.onboarding__cta {
+.workspace-empty__cta {
   margin-top: var(--space-2);
   border: none;
   border-radius: var(--radius-md);
@@ -331,34 +308,35 @@ button {
   transition: background-color 0.15s ease;
 }
 
-.onboarding__cta:hover {
+.workspace-empty__cta:hover {
   background: var(--color-accent-hover);
 }
 
-.onboarding__cta:disabled {
+.workspace-empty__cta:disabled {
   opacity: 0.6;
   cursor: default;
 }
 
-.onboarding__error {
+.workspace-empty__error {
   color: var(--color-danger);
   font-size: var(--font-size-sm);
 }
 
-.onboarding__recent {
-  margin-top: var(--space-4);
+.workspace-empty__recent {
+  margin-top: var(--space-5);
   width: 100%;
-  border-top: 1px solid var(--color-paper-border);
+  max-width: 380px;
+  border-top: 1px solid var(--color-border-subtle);
   padding-top: var(--space-4);
 }
 
-.onboarding__recent-label {
+.workspace-empty__recent-label {
   font-size: var(--font-size-sm);
-  color: var(--color-paper-text-secondary);
+  color: var(--color-text-tertiary);
   margin-bottom: var(--space-2);
 }
 
-.onboarding__recent-list {
+.workspace-empty__recent-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -366,14 +344,14 @@ button {
   overflow: auto;
 }
 
-.onboarding__recent-item {
+.workspace-empty__recent-item {
   display: block;
   width: 100%;
   text-align: left;
-  border: 1px solid var(--color-paper-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-paper-elevated);
-  color: var(--color-paper-text);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
@@ -385,43 +363,7 @@ button {
     background-color 0.15s ease;
 }
 
-.onboarding__recent-item:hover {
+.workspace-empty__recent-item:hover {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
-}
-
-.onboarding__recent-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.onboarding__recent-row .onboarding__recent-item {
-  flex: 1;
-  min-width: 0;
-}
-
-.onboarding__recent-remove {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--color-paper-text-secondary);
-  font-size: 11px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease,
-    color 0.15s ease;
-}
-
-.onboarding__recent-remove:hover {
-  border-color: var(--color-paper-border);
-  background: var(--color-danger-subtle);
-  color: var(--color-danger);
 }
