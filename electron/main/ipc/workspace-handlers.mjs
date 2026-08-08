@@ -13,9 +13,7 @@ import {
 
 export function registerWorkspaceHandlers() {
   // 激活工作区：返回 { ok, root } 或抛错（路径无效 / 不可访问）
-  ipcMain.handle('fs:activate_workspace', (_e, absPath) =>
-    activateWorkspace(absPath)
-  )
+  ipcMain.handle('fs:activate_workspace', (_e, absPath) => activateWorkspace(absPath))
 
   // 取消激活（渲染进程切换工作区前调用）
   ipcMain.handle('fs:deactivate_workspace', () => {

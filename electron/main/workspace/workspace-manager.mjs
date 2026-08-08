@@ -64,7 +64,5 @@ export function deactivateWorkspace() {
 
 /** 当前激活状态 */
 export function getWorkspaceStatus() {
-  return hasActiveFs() && activeRoot
-    ? { active: true, root: activeRoot }
-    : { active: false }
+  return hasActiveFs() && activeRoot ? { active: true, root: activeRoot } : { active: false }
 }

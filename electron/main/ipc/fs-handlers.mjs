@@ -17,13 +17,9 @@ export function registerFsHandlers() {
   ipcMain.handle('fs:write_file', (_e, relPath, content) =>
     getActiveFs().writeFile(relPath, content)
   )
-  ipcMain.handle('fs:list_directory', (_e, relPath) =>
-    getActiveFs().listDirectory(relPath)
-  )
+  ipcMain.handle('fs:list_directory', (_e, relPath) => getActiveFs().listDirectory(relPath))
   ipcMain.handle('fs:mkdir', (_e, relPath) => getActiveFs().mkdir(relPath))
-  ipcMain.handle('fs:rename', (_e, relFrom, relTo) =>
-    getActiveFs().rename(relFrom, relTo)
-  )
+  ipcMain.handle('fs:rename', (_e, relFrom, relTo) => getActiveFs().rename(relFrom, relTo))
   ipcMain.handle('fs:delete', (_e, relPath) => getActiveFs().delete(relPath))
   ipcMain.handle('fs:stat', (_e, relPath) => getActiveFs().stat(relPath))
 

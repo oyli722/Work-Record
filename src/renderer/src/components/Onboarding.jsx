@@ -32,12 +32,7 @@ export default function Onboarding({ workspace }) {
           你的记录始终保存在自己选的文件夹里。
         </p>
 
-        <button
-          type="button"
-          className="onboarding__cta"
-          onClick={handleChoose}
-          disabled={busy}
-        >
+        <button type="button" className="onboarding__cta" onClick={handleChoose} disabled={busy}>
           {busy ? '正在打开…' : '选择工作区文件夹'}
         </button>
 
