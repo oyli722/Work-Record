@@ -64,6 +64,109 @@ button {
   opacity: 0.6;
 }
 
+/* ============ 主区编辑器（阶段 3） ============ */
+
+.editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 极简工具条：文件名 + 保存状态 + 保存 */
+.editor__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.editor__file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.editor__status {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.editor__status--dirty {
+  color: var(--color-accent);
+}
+
+.editor__save {
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.editor__save:hover:not(:disabled) {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+.editor__save:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 编辑区（3.1 占位 textarea；暖纸阅读面，3.2 换 CodeMirror） */
+.editor__area {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: var(--color-paper);
+  color: var(--color-paper-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: 1.7;
+  padding: var(--space-4) var(--space-6);
+  user-select: text;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.editor__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-6);
+}
+
+.editor__empty-hint {
+  opacity: 0.55;
+}
+
+.editor__error {
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  background: var(--color-danger-subtle);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
 /* ============ 顶栏（极简·全局） ============ */
 
 .topbar {
@@ -261,11 +364,88 @@ button {
   margin: var(--space-1) 0;
 }
 
-/* 目录树区（阶段 4 填充） */
+/* 文件列表区（阶段 3.1 极简列表；阶段 4 目录树填充） */
 .sidebar__tree {
   flex: 1 1 auto;
-  overflow: auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
   padding: var(--space-2);
+}
+
+/* 极简图标开关：一键展开/收回文件列表（3.1 交互定案） */
+.sidebar__tree-toggle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar__tree-toggle:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.sidebar__tree-toggle--open {
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+/* 文件列表 */
+.sidebar__filelist {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__filelist-ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__filelist-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__filelist-item:hover {
+  background: var(--color-bg-subtle);
+}
+
+.sidebar__filelist-item--active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.sidebar__filelist-empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  padding: var(--space-1) var(--space-2);
 }
 
 /* ============ 主内容区空状态（无工作区） ============ */
