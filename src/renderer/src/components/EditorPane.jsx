@@ -30,6 +30,7 @@ export default function EditorPane({ editor }) {
             onChange={(e) => setContent(e.target.value)}
             spellCheck={false}
             placeholder="开始记录…"
+            autoFocus // 打开文件后自动聚焦（评审 S4；3.2 CodeMirror 接管）
           />
         </>
       ) : (

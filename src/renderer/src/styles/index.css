@@ -403,6 +403,16 @@ button {
   background: var(--color-accent-subtle);
 }
 
+.sidebar__tree-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+  color: var(--color-text-tertiary);
+}
+
+.sidebar__tree-toggle:disabled:hover {
+  background: transparent;
+}
+
 /* 目录树（阶段 3.1 最小形态：嵌套子文件夹 + 懒加载展开/关闭） */
 .sidebar__tree-body {
   display: flex;

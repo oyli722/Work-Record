@@ -29,12 +29,24 @@ export default function Sidebar({ workspace, editor }) {
     await switchWorkspace(absPath)
   }
 
-  /** 切换工作区：未保存内容先在旧边界下落盘，再取消激活、激活新路径，最后关闭编辑器（新工作区文件不同）。 */
+  /**
+   * 切换工作区。
+   * 未保存内容先保存；保存失败则中止切换、保留现场（PRD §4.1.6，评审 P3）。
+   * 成功激活后清空并收起目录树，重新展开时加载新工作区内容（不残留旧数据，评审 P2）。
+   */
   async function switchWorkspace(absPath) {
-    if (editor.dirty) await editor.save() // 尽力落盘，防切换丢失
+    if (editor.dirty) {
+      const r = await editor.save()
+      if (!r.ok) return r // 中止切换，error 已由 store 置入，主区显示
+    }
     await workspace.deactivate()
     const res = await workspace.activate(absPath)
     editor.close()
+    if (res.ok) {
+      setTree(null)
+      setListError(null)
+      setListOpen(false)
+    }
     return res
   }
 
@@ -173,7 +185,14 @@ export default function Sidebar({ workspace, editor }) {
           className={`sidebar__tree-toggle${listOpen ? ' sidebar__tree-toggle--open' : ''}`}
           onClick={toggleList}
           aria-expanded={listOpen}
-          title={listOpen ? '收回文件列表' : '展开文件列表'}
+          disabled={workspace.state !== 'active'} // 无工作区时禁用（评审 S3）
+          title={
+            workspace.state !== 'active'
+              ? '先选择工作区'
+              : listOpen
+                ? '收回文件列表'
+                : '展开文件列表'
+          }
         >
           {/* 极简文件夹图标：收起=闭合、展开=打开 */}
           <FolderIcon open={listOpen} />

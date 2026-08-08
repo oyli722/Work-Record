@@ -30,7 +30,8 @@ export default function useEditor() {
     try {
       await window.mework.fs.writeFile(file, text)
       savedContentRef.current = text
-      setSaveState('saved')
+      // 保存期间若有新编辑，保持 dirty，避免「已保存」状态失真丢编辑（评审 P1）
+      setSaveState(contentRef.current === text ? 'saved' : 'dirty')
       return { ok: true }
     } catch (err) {
       setSaveState('dirty')
