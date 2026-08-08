@@ -71,10 +71,7 @@ export function createPathGuard(root) {
 
   /** (c) symlink 逃逸校验：目标真实路径必须落在根 realpath 子树内 */
   async function assertNoSymlinkEscape(absPath) {
-    const [rootRealRaw, targetRealRaw] = await Promise.all([
-      getRootReal(),
-      realpathUp(absPath)
-    ])
+    const [rootRealRaw, targetRealRaw] = await Promise.all([getRootReal(), realpathUp(absPath)])
     const rootReal = normalizeCase(rootRealRaw.replace(/[\\/]+$/, ''))
     const targetReal = normalizeCase(targetRealRaw)
     if (targetReal !== rootReal && !targetReal.startsWith(rootReal + sep)) {
