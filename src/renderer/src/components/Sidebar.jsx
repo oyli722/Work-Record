@@ -50,15 +50,25 @@ export default function Sidebar({ workspace }) {
             {workspace.recent
               .filter((p) => p !== workspace.activePath)
               .map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  className="sidebar__menu-item"
-                  onClick={() => handleSwitch(p)}
-                  title={p}
-                >
-                  {p}
-                </button>
+                <div key={p} className="sidebar__menu-row">
+                  <button
+                    type="button"
+                    className="sidebar__menu-item"
+                    onClick={() => handleSwitch(p)}
+                    title={p}
+                  >
+                    {p}
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar__menu-remove"
+                    onClick={() => workspace.removeFromRecent(p)}
+                    title="从最近列表移除"
+                    aria-label={`移除 ${p}`}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
             <div className="sidebar__menu-sep" />
             <button type="button" className="sidebar__menu-item" onClick={handleChooseNew}>

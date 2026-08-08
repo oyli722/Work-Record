@@ -203,6 +203,46 @@ button {
   background: var(--color-bg-subtle);
 }
 
+.sidebar__menu-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sidebar__menu-row .sidebar__menu-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar__menu-remove {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.sidebar__menu-row:hover .sidebar__menu-remove {
+  opacity: 1;
+}
+
+.sidebar__menu-remove:hover {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
 .sidebar__menu-sep {
   height: 1px;
   background: var(--color-border-subtle);
@@ -216,51 +256,65 @@ button {
   padding: var(--space-2);
 }
 
-/* ============ 首次引导 ============ */
+/* ============ 首次引导（暖纸书桌空状态） ============ */
 
 .onboarding {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background: var(--color-bg);
+  /* 整页暖纸底色：无工作区时即「书桌摊开的纸面」，与工作区冷灰外壳对比 */
+  background: var(--color-paper);
+  color: var(--color-paper-text);
+  transition: background-color 0.2s ease;
 }
 
-.onboarding__card {
-  width: 100%;
-  max-width: 440px;
-  background: var(--color-paper);
-  border: 1px solid var(--color-paper-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-6);
+.onboarding__inner {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: var(--space-4);
-  color: var(--color-paper-text);
+  max-width: 400px;
+}
+
+/* 线性图标：强调色、克制描边 */
+.onboarding__icon {
+  color: var(--color-accent);
+  opacity: 0.9;
+  margin-bottom: var(--space-2);
+}
+
+.onboarding__eyebrow {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent);
 }
 
 .onboarding__title {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .onboarding__desc {
   font-size: var(--font-size-base);
   color: var(--color-paper-text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .onboarding__cta {
-  align-self: stretch;
+  margin-top: var(--space-2);
   border: none;
   border-radius: var(--radius-md);
   background: var(--color-accent);
   color: #fff;
   font-size: var(--font-size-base);
   font-weight: 600;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-6);
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -280,8 +334,10 @@ button {
 }
 
 .onboarding__recent {
+  margin-top: var(--space-4);
+  width: 100%;
   border-top: 1px solid var(--color-paper-border);
-  padding-top: var(--space-3);
+  padding-top: var(--space-4);
 }
 
 .onboarding__recent-label {
@@ -291,7 +347,6 @@ button {
 }
 
 .onboarding__recent-list {
-  list-style: none;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -303,18 +358,58 @@ button {
   display: block;
   width: 100%;
   text-align: left;
-  border: none;
-  background: transparent;
+  border: 1px solid var(--color-paper-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-elevated);
   color: var(--color-paper-text);
   font-size: var(--font-size-sm);
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .onboarding__recent-item:hover {
-  background: var(--color-paper-border);
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.onboarding__recent-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.onboarding__recent-row .onboarding__recent-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.onboarding__recent-remove {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-paper-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.onboarding__recent-remove:hover {
+  border-color: var(--color-paper-border);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
 }

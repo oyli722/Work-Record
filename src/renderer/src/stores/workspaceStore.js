@@ -94,6 +94,16 @@ export default function useWorkspace() {
     return { ok: res.ok, restored: res.ok }
   }, [activate])
 
+  /** 从最近列表移除工作区（仅删记录，不碰磁盘任何文件） */
+  const removeFromRecent = useCallback(
+    (absPath) => {
+      const next = recent.filter((p) => p !== absPath)
+      writeRecent(next)
+      setRecent(next)
+    },
+    [recent]
+  )
+
   return {
     recent,
     activePath,
@@ -101,6 +111,7 @@ export default function useWorkspace() {
     error,
     activate,
     deactivate,
-    restore
+    restore,
+    removeFromRecent
   }
 }
