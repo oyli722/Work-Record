@@ -1,26 +1,19 @@
 // 侧边栏（布局定案 2026-08-09）
-// 顶部：当前工作区（路径 + 切换菜单）；下方：文件列表区（3.1：极简图标一键展开/收回，
-// 顶层 MD/TXT 列表 + 点击打开；阶段 4 替换为完整目录树）。
+// 顶部：当前工作区（路径 + 切换菜单）；下方：目录树最小形态（3.1 交互定案——
+// 极简文件夹图标置树区顶部、默认收起一键展开/收回；展示嵌套子文件夹，点击整行展开/关闭，
+// 懒加载子级；文件节点点击打开）。阶段 4 在此演进为完整目录树 CRUD。
 // 工作区路径在此显示，顶栏不再承载工作区信息。
 import { useState } from 'react'
+import FileTree, { FolderIcon } from './FileTree'
 
 const DOC_EXT = /\.(md|txt)$/i
 
 export default function Sidebar({ workspace, editor }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const [listOpen, setListOpen] = useState(false) // 文件列表展开/收回
-  const [files, setFiles] = useState(null)
+  const [listOpen, setListOpen] = useState(false) // 目录树展开/收回
+  const [tree, setTree] = useState(null) // 顶层节点数组
   const [listError, setListError] = useState(null)
   const [listLoading, setListLoading] = useState(false)
-
-  /** 切换工作区：未保存内容先在旧边界下落盘，再取消激活、激活新路径，最后关闭编辑器（新工作区文件不同）。 */
-  async function switchWorkspace(absPath) {
-    if (editor.dirty) await editor.save() // 尽力落盘，防切换丢失
-    await workspace.deactivate()
-    const res = await workspace.activate(absPath)
-    editor.close()
-    return res
-  }
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -36,13 +29,50 @@ export default function Sidebar({ workspace, editor }) {
     await switchWorkspace(absPath)
   }
 
-  /** 展开时加载顶层 MD/TXT；收回状态不持有数据 */
-  async function loadFiles() {
+  /** 切换工作区：未保存内容先在旧边界下落盘，再取消激活、激活新路径，最后关闭编辑器（新工作区文件不同）。 */
+  async function switchWorkspace(absPath) {
+    if (editor.dirty) await editor.save() // 尽力落盘，防切换丢失
+    await workspace.deactivate()
+    const res = await workspace.activate(absPath)
+    editor.close()
+    return res
+  }
+
+  /** 将目录项构造成树节点：文件夹全保留、文件只留 MD/TXT；目录在前、文件在后，各按名称排序 */
+  async function buildNodes(entries, parentPath) {
+    const nodes = []
+    for (const name of entries) {
+      const relPath = parentPath ? `${parentPath}/${name}` : name
+      let info
+      try {
+        info = await window.mework.fs.stat(relPath)
+      } catch {
+        continue // 无法 stat（并发删除等）跳过
+      }
+      if (!info.isDirectory && !DOC_EXT.test(name)) continue
+      nodes.push({
+        name,
+        relPath,
+        isDir: info.isDirectory,
+        expanded: false,
+        loading: false,
+        error: null,
+        children: null
+      })
+    }
+    return nodes.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
+      return a.name.localeCompare(b.name, 'zh')
+    })
+  }
+
+  /** 加载根层节点（首次展开时） */
+  async function loadRoot() {
     setListLoading(true)
     setListError(null)
     try {
       const entries = await window.mework.fs.listDirectory('.')
-      setFiles(entries.filter((n) => DOC_EXT.test(n)))
+      setTree(await buildNodes(entries, ''))
     } catch (err) {
       setListError(String(err?.message ?? err))
     } finally {
@@ -50,9 +80,30 @@ export default function Sidebar({ workspace, editor }) {
     }
   }
 
+  /** 展开/关闭文件夹节点（懒加载子级；关闭时释放子数据保持新鲜） */
+  async function toggleFolder(node) {
+    if (node.expanded) {
+      node.expanded = false
+      node.children = null
+    } else {
+      node.expanded = true
+      node.loading = true
+      setTree([...tree]) // 先渲染加载态
+      try {
+        const entries = await window.mework.fs.listDirectory(node.relPath)
+        node.children = await buildNodes(entries, node.relPath)
+      } catch (err) {
+        node.error = String(err?.message ?? err)
+      } finally {
+        node.loading = false
+      }
+    }
+    setTree([...tree])
+  }
+
   function toggleList() {
     const next = !listOpen
-    if (next) loadFiles()
+    if (next && !tree && !listLoading) loadRoot()
     setListOpen(next)
   }
 
@@ -115,7 +166,7 @@ export default function Sidebar({ workspace, editor }) {
         )}
       </div>
 
-      {/* 文件列表区（阶段 4：递归目录树） */}
+      {/* 目录树区（阶段 4：完整目录树 CRUD） */}
       <div className="sidebar__tree" aria-label="文件列表">
         <button
           type="button"
@@ -124,47 +175,19 @@ export default function Sidebar({ workspace, editor }) {
           aria-expanded={listOpen}
           title={listOpen ? '收回文件列表' : '展开文件列表'}
         >
-          {/* 极简线性列表图标（类 SF Symbols） */}
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <line x1="2" y1="3.5" x2="14" y2="3.5" />
-            <line x1="2" y1="8" x2="14" y2="8" />
-            <line x1="2" y1="12.5" x2="14" y2="12.5" />
-          </svg>
+          {/* 极简文件夹图标：收起=闭合、展开=打开 */}
+          <FolderIcon open={listOpen} />
         </button>
 
         {listOpen && (
-          <div className="sidebar__filelist">
-            {listError && <p className="sidebar__filelist-empty">{listError}</p>}
-            {!listError && listLoading && <p className="sidebar__filelist-empty">加载中…</p>}
-            {!listError && !listLoading && files && files.length === 0 && (
-              <p className="sidebar__filelist-empty">无 MD / TXT 文件</p>
+          <div className="sidebar__tree-body">
+            {listError && <p className="filetree__status filetree__status--error">{listError}</p>}
+            {!listError && listLoading && <p className="filetree__status">加载中…</p>}
+            {!listError && !listLoading && tree && tree.length === 0 && (
+              <p className="filetree__status">工作区为空</p>
             )}
-            {!listError && files && files.length > 0 && (
-              <ul className="sidebar__filelist-ul">
-                {files.map((f) => (
-                  <li key={f}>
-                    <button
-                      type="button"
-                      className={`sidebar__filelist-item${
-                        editor.currentFile === f ? ' sidebar__filelist-item--active' : ''
-                      }`}
-                      onClick={() => editor.openFile(f)}
-                      title={f}
-                    >
-                      {f}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {!listError && !listLoading && tree && tree.length > 0 && (
+              <FileTree nodes={tree} editor={editor} onToggle={toggleFolder} />
             )}
           </div>
         )}
