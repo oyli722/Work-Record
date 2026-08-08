@@ -5,7 +5,7 @@ import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 
 // MeWork 主进程入口
 // 安全基线（PRD §3.2.1）：contextIsolation:true、nodeIntegration:false、sandbox:true
-// 所有 fs 操作将统一经 electron/main/storage/fs-ops.js（阶段 2），本阶段仅空壳骨架。
+// 所有 fs 操作统一经 electron/main/storage/fs-ops.mjs（内部经 pathGuard 沙箱，PRD §7.1）。
 
 const isDev = !app.isPackaged
 

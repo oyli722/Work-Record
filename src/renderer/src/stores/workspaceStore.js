@@ -46,7 +46,8 @@ function writeActive(path) {
 export default function useWorkspace() {
   const [recent, setRecent] = useState(readRecent)
   const [activePath, setActivePath] = useState(readActive)
-  const [state, setState] = useState('idle') // idle | activating | active | error
+  // 初始 state 按是否记忆激活路径判定：有 → 恢复中（避免首帧闪烁「选择工作区」，评审 S4）
+  const [state, setState] = useState(() => (readActive() ? 'activating' : 'idle')) // idle | activating | active
   const [error, setError] = useState(null)
 
   /** 激活一个工作区（用户在引导 / 切换时调用） */
@@ -63,8 +64,12 @@ export default function useWorkspace() {
         setState('active')
         return { ok: true }
       } catch (err) {
+        // 激活失败：清空记忆路径（失效即引导重新选择，PRD §4.1.4）、回引导态，
+        // error 留存在 store 供空状态展示（评审 P1 / G1）
+        writeActive(null)
         setError(String(err?.message ?? err))
-        setState('error')
+        setActivePath(null)
+        setState('idle')
         return { ok: false, error: String(err?.message ?? err) }
       }
     },
@@ -81,6 +86,7 @@ export default function useWorkspace() {
     writeActive(null)
     setActivePath(null)
     setState('idle')
+    setError(null) // 回干净的空状态，不残留上一次操作错误
   }, [])
 
   /** 启动时恢复：若已记忆激活路径，尝试重新激活（PRD §4.1.4 有效性校验） */

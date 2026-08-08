@@ -1,5 +1,6 @@
 import { readFile, writeFile, readdir, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { WR_DIR_NAME } from './constants.mjs'
 
 /**
  * fs-ops 受控文件系统抽象层（PRD §7.1）
@@ -32,10 +33,12 @@ export function createFsOps(guard) {
       await writeFile(abs, content, 'utf-8')
     },
 
-    /** 列出目录项（名称数组）。仅顶层，不递归（递归由目录树阶段负责）。 */
+    /** 列出目录项（名称数组）。仅顶层，不递归（递归由目录树阶段负责）。
+        过滤衍生数据目录 `.wr/`（PRD §3.3/§4.3.7）：目录树等 UI 默认不可见，评审 S1。 */
     async listDirectory(relPath) {
       const abs = await safe(relPath)
-      return readdir(abs)
+      const entries = await readdir(abs)
+      return entries.filter((name) => name !== WR_DIR_NAME)
     },
 
     /** 创建目录（递归）。 */

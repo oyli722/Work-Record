@@ -19,7 +19,9 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const hasWorkspace = workspace.state === 'active'
+  const isActive = workspace.state === 'active'
+  // 激活中（启动恢复 / 切换）：显示恢复提示，避免首帧误显「选择工作区」（评审 S4）
+  const isRestoring = workspace.state === 'activating'
 
   return (
     <div className="app">
@@ -27,9 +29,13 @@ export default function App() {
       <div className="app__body">
         <Sidebar workspace={workspace} />
         <main className="app__main">
-          {hasWorkspace ? (
+          {isActive ? (
             <div className="app__status">
               <p className="app__hint">工作区已就绪</p>
+            </div>
+          ) : isRestoring ? (
+            <div className="app__status">
+              <p className="app__hint">正在恢复工作区…</p>
             </div>
           ) : (
             <WorkspaceEmpty workspace={workspace} />

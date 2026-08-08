@@ -47,6 +47,13 @@ test('listDirectory 列出顶层目录项', async () => {
   assert.ok(items.includes('sub'))
 })
 
+test('listDirectory 排除 .wr 衍生目录', async () => {
+  await ops.writeFile('.wr/meta.json', '{}')
+  const items = await ops.listDirectory('.')
+  assert.ok(!items.includes('.wr')) // 衍生目录对目录树隐藏
+  assert.ok(items.includes('a.txt')) // 正常项仍可见
+})
+
 test('mkdir 创建嵌套目录', async () => {
   await ops.mkdir('x/y/z')
   const stat = await ops.stat('x/y/z')

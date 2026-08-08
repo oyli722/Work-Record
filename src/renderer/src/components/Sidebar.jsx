@@ -8,10 +8,10 @@ export default function Sidebar({ workspace }) {
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
-    // 切换工作区：先取消激活当前（清空 fs 边界），再激活新路径
+    // 切换工作区：先取消激活当前（清空 fs 边界），再激活新路径。
+    // activate 失败时 store 已自行回引导态并保留错误（评审 P1），无需额外兜底。
     await workspace.deactivate()
-    const res = await workspace.activate(absPath)
-    if (!res.ok) await workspace.deactivate() // 失败兜底回引导态
+    await workspace.activate(absPath)
   }
 
   async function handleChooseNew() {
@@ -19,8 +19,7 @@ export default function Sidebar({ workspace }) {
     const absPath = await window.mework.fs.chooseDirectory()
     if (!absPath) return
     await workspace.deactivate()
-    const res = await workspace.activate(absPath)
-    if (!res.ok) await workspace.deactivate()
+    await workspace.activate(absPath)
   }
 
   return (

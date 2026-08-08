@@ -13,14 +13,17 @@ export default function WorkspaceEmpty({ workspace }) {
     try {
       const absPath = await window.mework.fs.chooseDirectory()
       if (!absPath) return // 用户取消
-      const res = await workspace.activate(absPath)
-      if (!res.ok) setError(res.error)
+      await workspace.activate(absPath) // 激活失败已由 store 置 error，统一在下方展示
     } catch (err) {
+      // 兜底：chooseDirectory 等意外错误（激活失败已在 store 层记录）
       setError(String(err?.message ?? err))
     } finally {
       setBusy(false)
     }
   }
+
+  // 展示错误：优先本地（意外错误），否则用 store 级（restore/切换/激活失败，评审 P1）
+  const shownError = error || workspace.error
 
   return (
     <div className="workspace-empty">
@@ -34,7 +37,7 @@ export default function WorkspaceEmpty({ workspace }) {
         {busy ? '正在打开…' : '选择工作区'}
       </button>
 
-      {error && <p className="workspace-empty__error">{error}</p>}
+      {shownError && <p className="workspace-empty__error">{shownError}</p>}
 
       {workspace.recent.length > 0 && (
         <div className="workspace-empty__recent">

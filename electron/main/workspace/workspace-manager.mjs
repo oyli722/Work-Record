@@ -49,7 +49,13 @@ export async function activateWorkspace(absPath) {
   const ops = createFsOps(guard)
 
   // 初始化衍生数据目录（集中存放，保持工作区整洁，PRD §4.3.7 / §3.3.2）
-  await mkdir(guard.resolvePath(WR_DIR_NAME), { recursive: true })
+  // 写权限以实际可写性为准：.wr/ 初始化失败即视为不可写。
+  // （Windows 目录 access W_OK 判断不可靠，不依赖它——评审 S2）
+  try {
+    await mkdir(guard.resolvePath(WR_DIR_NAME), { recursive: true })
+  } catch (err) {
+    throw new Error(`workspace: 工作区不可写（${err?.code ?? 'EACCES'}）「${guard.root}」`)
+  }
 
   activeRoot = guard.root
   setActiveFs(ops)
