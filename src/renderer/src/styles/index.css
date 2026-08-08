@@ -1,0 +1,52 @@
+/* MeWork 全局样式（阶段 1 骨架）
+   主题 token 体系于 1.4 子阶段引入（颜色 / 间距 / 圆角 / 阴影 / 字体）。
+   此处仅提供骨架所需的最小布局，避免提前写死颜色。 */
+
+:root {
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app__topbar {
+  flex: 0 0 auto;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-weight: 600;
+}
+
+.app__content {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app__hint {
+  opacity: 0.6;
+}
