@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
+import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 
 // MeWork 主进程入口
 // 安全基线（PRD §3.2.1）：contextIsolation:true、nodeIntegration:false、sandbox:true
@@ -80,4 +81,7 @@ function registerIpcHandlers() {
     pong: 'pong',
     ts: Date.now()
   }))
+
+  // 阶段 2 受控 fs API（PRD §7.1：统一经 fs-ops + pathGuard）
+  registerFsHandlers()
 }

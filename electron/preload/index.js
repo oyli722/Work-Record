@@ -8,7 +8,23 @@ import { contextBridge, ipcRenderer } from 'electron'
 // 渲染进程可见的受控 API（window.mework）
 const api = {
   /** 连通性自检：渲染进程 → 主进程 ping 往返（阶段 1） */
-  ping: () => ipcRenderer.invoke('fs:ping')
+  ping: () => ipcRenderer.invoke('fs:ping'),
+
+  /** 文件系统受控 API（阶段 2，全部经主进程 pathGuard 沙箱） */
+  fs: {
+    readFile: (relPath) => ipcRenderer.invoke('fs:read_file', relPath),
+    writeFile: (relPath, content) =>
+      ipcRenderer.invoke('fs:write_file', relPath, content),
+    listDirectory: (relPath) =>
+      ipcRenderer.invoke('fs:list_directory', relPath),
+    mkdir: (relPath) => ipcRenderer.invoke('fs:mkdir', relPath),
+    rename: (relFrom, relTo) =>
+      ipcRenderer.invoke('fs:rename', relFrom, relTo),
+    delete: (relPath) => ipcRenderer.invoke('fs:delete', relPath),
+    stat: (relPath) => ipcRenderer.invoke('fs:stat', relPath),
+    /** 打开系统目录选择对话框，返回选中目录绝对路径或 null（工作区引导用） */
+    chooseDirectory: () => ipcRenderer.invoke('fs:choose_directory')
+  }
 }
 
 contextBridge.exposeInMainWorld('mework', api)
