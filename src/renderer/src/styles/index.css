@@ -1,6 +1,6 @@
-/* MeWork 全局样式（阶段 2：工作区 UI）
-   全部颜色 / 阴影 / 字体经 tokens.css 的 CSS 变量驱动（PRD §4.6.3，无硬编码）。
-   风格：Apple 克制（§3.4.1）——留白、柔和阴影、圆角；引导卡片用暖纸色阅读面。 */
+/* MeWork 全局样式（阶段 2 布局定案 2026-08-09）
+   主壳：顶栏(极简) + 主体[侧边栏 | 主区]。全部 token 驱动（PRD §4.6.3）。
+   布局面向完整形态：侧边栏顶部=工作区、下方=目录树(阶段4)；主区=工具条+编辑器(阶段3)。 */
 
 * {
   box-sizing: border-box;
@@ -33,48 +33,43 @@ button {
 /* ============ 主壳布局 ============ */
 
 .app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: var(--topbar-height) 1fr;
   height: 100%;
 }
 
-.app__content {
-  flex: 1 1 auto;
+/* 主体：侧边栏 | 主区（grid 二列，侧边栏可折叠/调宽随阶段 4） */
+.app__body {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app__main {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
+  flex-direction: column;
+  min-width: 0;
   overflow: auto;
 }
 
 .app__status {
+  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: center;
 }
 
 .app__hint {
   opacity: 0.6;
 }
 
-.app__workspace-path {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  word-break: break-all;
-  max-width: 60vw;
-  text-align: center;
-}
-
-/* ============ 顶栏 ============ */
+/* ============ 顶栏（极简·全局） ============ */
 
 .topbar {
-  flex: 0 0 auto;
-  height: var(--topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
   padding: 0 var(--space-4);
   background: var(--color-bg-elevated);
   border-bottom: 1px solid var(--color-border-subtle);
@@ -82,115 +77,14 @@ button {
   z-index: 10;
 }
 
-.topbar__left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
 .topbar__title {
   font-weight: 600;
-  flex-shrink: 0;
-}
-
-.topbar__divider {
-  width: 1px;
-  height: 16px;
-  background: var(--color-border);
-  flex-shrink: 0;
-}
-
-.topbar__workspace {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
 }
 
 .topbar__right {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex-shrink: 0;
-}
-
-/* 工作区切换菜单 */
-.topbar__menu {
-  position: relative;
-}
-
-.topbar__menu-btn {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-subtle);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.topbar__menu-btn:hover {
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent);
-}
-
-.topbar__menu-pop {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  min-width: 260px;
-  max-width: 380px;
-  list-style: none;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-1);
-  z-index: 20;
-}
-
-.topbar__menu-label {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  padding: var(--space-1) var(--space-3);
-}
-
-.topbar__menu-empty {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
-  padding: var(--space-1) var(--space-3);
-}
-
-.topbar__menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.topbar__menu-item:hover {
-  background: var(--color-bg-subtle);
-}
-
-.topbar__menu-sep {
-  height: 1px;
-  background: var(--color-border-subtle);
-  margin: var(--space-1) 0;
 }
 
 .topbar__theme {
@@ -211,10 +105,120 @@ button {
   border-color: var(--color-accent);
 }
 
+/* ============ 侧边栏（工作区 + 目录树） ============ */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-bg-elevated);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+/* 工作区区（侧边栏顶部） */
+.sidebar__workspace {
+  position: relative;
+  flex: 0 0 auto;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.sidebar__ws-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar__ws-btn:hover {
+  background: var(--color-bg-subtle);
+}
+
+.sidebar__ws-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+}
+
+.sidebar__ws-caret {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+/* 工作区切换菜单 */
+.sidebar__menu {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  top: calc(100% - 2px);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-1);
+  z-index: 30;
+}
+
+.sidebar__menu-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  padding: var(--space-1) var(--space-3);
+}
+
+.sidebar__menu-empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  padding: var(--space-1) var(--space-3);
+}
+
+.sidebar__menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__menu-item:hover {
+  background: var(--color-bg-subtle);
+}
+
+.sidebar__menu-sep {
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin: var(--space-1) 0;
+}
+
+/* 目录树区（阶段 4 填充） */
+.sidebar__tree {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: var(--space-2);
+}
+
 /* ============ 首次引导 ============ */
 
 .onboarding {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;

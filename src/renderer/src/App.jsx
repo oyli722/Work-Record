@@ -3,10 +3,11 @@ import useTheme from './hooks/useTheme'
 import useWorkspace from './stores/workspaceStore'
 import Onboarding from './components/Onboarding'
 import TopBar from './components/TopBar'
+import Sidebar from './components/Sidebar'
 
 // MeWork 根组件（阶段 2：工作区引导与主壳路由）
-// 状态机：无激活工作区 → Onboarding（首次引导）；有激活 → 主壳（顶栏 + 内容占位）。
-// 启动时 restore() 尝试恢复上次工作区（PRD §4.1.2 / §4.1.4 有效性校验）。
+// 状态机：无激活工作区 → Onboarding（首次引导）；有激活 → 主壳。
+// 主壳布局定案（2026-08-09）：顶栏（极简全局） + 侧边栏（工作区 + 目录树） + 主区。
 export default function App() {
   const { theme, toggleTheme } = useTheme()
   const workspace = useWorkspace()
@@ -26,16 +27,18 @@ export default function App() {
     )
   }
 
-  // 有激活工作区 → 主壳（编辑器 / 目录树后续阶段填充）
+  // 有激活工作区 → 主壳（编辑器 / 目录树 / 标签栏后续阶段填充）
   return (
     <div className="app">
-      <TopBar workspace={workspace} theme={theme} onToggleTheme={toggleTheme} />
-      <main className="app__content">
-        <div className="app__status">
-          <p className="app__hint">工作区已就绪</p>
-          <p className="app__workspace-path">{workspace.activePath}</p>
-        </div>
-      </main>
+      <TopBar theme={theme} onToggleTheme={toggleTheme} />
+      <div className="app__body">
+        <Sidebar workspace={workspace} />
+        <main className="app__main">
+          <div className="app__status">
+            <p className="app__hint">工作区已就绪</p>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
