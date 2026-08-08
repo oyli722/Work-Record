@@ -1,0 +1,53 @@
+# ---- 依赖 ----
+node_modules/
+
+# ---- 构建产物 ----
+dist/
+build/
+out/
+release/
+.vite/
+
+# ---- 打包产物 ----
+*.app
+*.exe
+*.dmg
+*.msi
+*.AppImage
+
+# ---- 日志 ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- 密钥 / 环境变量（禁止提交）----
+.env
+.env.*
+!.env.example
+
+# ---- 本地运行时数据（用户工作区内容不入库）----
+data/
+workspace-test/
+tmp/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Claude Code 本地设置（不入库）----
+.claude/settings.local.json
+.claude/*.json
+.claude/*.lock
+
+# ---- 评审记录（临时文件，验收通过后删除；不入库防历史污染）----
+docs/*-评审记录.md
+
+# ---- 缓存 ----
+.cache/
+.eslintcache
+*.tsbuildinfo
