@@ -28,18 +28,21 @@ function createWindow() {
   // 待窗口 ready-to-show 再显示，避免白屏闪烁
   win.once('ready-to-show', () => win.show())
 
-  // 外链用系统浏览器打开（PRD §4.4.3），不在应用内新开窗口
+  // 外链用系统浏览器打开（PRD §4.4.3），不在应用内新开窗口；
+  // 仅放行 http/https，杜绝 file:// 等协议被带出用系统程序打开（S2 评审加固）
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
 
   // dev 模式透传渲染进程 console 到终端，便于调试（生产构建下不启用）
+  // 注：Electron 41 起 console-message 使用结构化事件对象，level 为字符串（S1 评审修订）
   if (isDev) {
-    win.webContents.on('console-message', (_e, level, message) => {
+    win.webContents.on('console-message', (event) => {
+      const { level, message } = event
       const tag = `[renderer:${level}]`
-      if (level === 3) console.error(tag, message)
-      else if (level === 2) console.warn(tag, message)
+      if (level === 'error') console.error(tag, message)
+      else if (level === 'warning') console.warn(tag, message)
       else console.log(tag, message)
     })
   }
