@@ -33,6 +33,15 @@
   --color-danger: #ff453a;
   --color-danger-subtle: #ffe5e2;
 
+  /* ---- 阅读面（暖纸色，样式确认 2026-08-09）----
+     内容区 / 编辑器 / 预览的基础色，与冷色玻璃外壳形成「桌上摊开笔记」对比。
+     由用户确认采纳（见《进度看板》待办区登记）。 */
+  --color-paper: #faf9f7;
+  --color-paper-elevated: #ffffff;
+  --color-paper-text: #1d1d1f;
+  --color-paper-text-secondary: #6e6e73;
+  --color-paper-border: #e6e3de;
+
   /* ---- 间距（4 的倍数，克制留白） ---- */
   --space-1: 4px;
   --space-2: 8px;
@@ -89,6 +98,13 @@
   --color-warning: #ffd60a;
   --color-danger: #ff453a;
   --color-danger-subtle: #4a2a28;
+
+  /* 深色阅读面：暖纸色在暗背景下取暖黑（#21201e），与外壳冷黑区分 */
+  --color-paper: #21201e;
+  --color-paper-elevated: #2a2926;
+  --color-paper-text: #f0efe9;
+  --color-paper-text-secondary: #a3a19a;
+  --color-paper-border: #3a3834;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
