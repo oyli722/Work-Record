@@ -28,6 +28,7 @@ export default function CodeMirrorEditor({ value, onChange, theme }) {
       extensions: [
         basicSetup,
         markdown(),
+        EditorView.lineWrapping, // 软换行：长行（含 MD 长段落）自动换行，避免水平滚动
         themeComp.of(theme === 'dark' ? oneDark : []),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString())
