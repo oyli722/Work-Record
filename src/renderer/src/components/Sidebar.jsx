@@ -46,18 +46,21 @@ export default function Sidebar({ workspace }) {
         {menuOpen && (
           <div className="sidebar__menu">
             <p className="sidebar__menu-label">最近使用</p>
-            {workspace.recent.length === 0 && <p className="sidebar__menu-empty">暂无其他工作区</p>}
-            {workspace.recent
-              .filter((p) => p !== workspace.activePath)
-              .map((p) => (
+            {workspace.recent.length === 0 && <p className="sidebar__menu-empty">暂无工作区</p>}
+            {workspace.recent.map((p) => {
+              const isActive = p === workspace.activePath
+              return (
                 <div key={p} className="sidebar__menu-row">
                   <button
                     type="button"
-                    className="sidebar__menu-item"
-                    onClick={() => handleSwitch(p)}
+                    className={`sidebar__menu-item${isActive ? ' sidebar__menu-item--active' : ''}`}
+                    onClick={() => {
+                      if (!isActive) handleSwitch(p)
+                    }}
                     title={p}
                   >
                     {p}
+                    {isActive && <span className="sidebar__menu-current">当前</span>}
                   </button>
                   <button
                     type="button"
@@ -69,7 +72,8 @@ export default function Sidebar({ workspace }) {
                     ✕
                   </button>
                 </div>
-              ))}
+              )
+            })}
             <div className="sidebar__menu-sep" />
             <button type="button" className="sidebar__menu-item" onClick={handleChooseNew}>
               ＋ 更换工作区…

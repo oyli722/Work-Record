@@ -203,6 +203,18 @@ button {
   background: var(--color-bg-subtle);
 }
 
+.sidebar__menu-item--active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.sidebar__menu-current {
+  margin-left: var(--space-2);
+  font-size: 11px;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
 .sidebar__menu-row {
   display: flex;
   align-items: center;

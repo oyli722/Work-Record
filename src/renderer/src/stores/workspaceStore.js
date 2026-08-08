@@ -94,14 +94,19 @@ export default function useWorkspace() {
     return { ok: res.ok, restored: res.ok }
   }, [activate])
 
-  /** 从最近列表移除工作区（仅删记录，不碰磁盘任何文件） */
+  /** 从最近列表移除工作区（仅删记录，不碰磁盘任何文件）。
+      若移除的是当前激活的工作区，同步取消激活（回引导态），
+      避免「列表已清空但侧边栏顶部仍残留一个工作区」。 */
   const removeFromRecent = useCallback(
     (absPath) => {
       const next = recent.filter((p) => p !== absPath)
       writeRecent(next)
       setRecent(next)
+      if (absPath === activePath) {
+        deactivate()
+      }
     },
-    [recent]
+    [recent, activePath, deactivate]
   )
 
   return {
