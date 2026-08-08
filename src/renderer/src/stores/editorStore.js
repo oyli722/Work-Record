@@ -44,7 +44,9 @@ export default function useEditor() {
       return { ok: true }
     } catch (err) {
       setSaveState('dirty')
-      return { ok: false, error: String(err?.message ?? err) }
+      const msg = String(err?.message ?? err)
+      setError(msg) // 保存失败统一提示（评审 S-3.3-1：自动保存失败也应有原因）
+      return { ok: false, error: msg }
     }
   }, [])
 
