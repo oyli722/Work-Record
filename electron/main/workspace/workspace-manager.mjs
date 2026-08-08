@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import { createPathGuard } from '../storage/path-guard.mjs'
 import { createFsOps } from '../storage/fs-ops.mjs'
 import { setActiveFs, clearActiveFs, hasActiveFs } from '../storage/fs-context.mjs'
+import { WR_DIR_NAME } from '../storage/constants.mjs'
 
 /**
  * workspace-manager：工作区激活管理（主进程）
@@ -47,8 +48,8 @@ export async function activateWorkspace(absPath) {
   const guard = createPathGuard(absPath)
   const ops = createFsOps(guard)
 
-  // 初始化衍生数据目录（集中存放，保持工作区整洁，PRD §4.3.7）
-  await mkdir(guard.resolvePath('.wr'), { recursive: true })
+  // 初始化衍生数据目录（集中存放，保持工作区整洁，PRD §4.3.7 / §3.3.2）
+  await mkdir(guard.resolvePath(WR_DIR_NAME), { recursive: true })
 
   activeRoot = guard.root
   setActiveFs(ops)
