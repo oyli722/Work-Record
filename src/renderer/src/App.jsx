@@ -1,52 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import useTheme from './hooks/useTheme'
+import useWorkspace from './stores/workspaceStore'
+import Onboarding from './components/Onboarding'
+import TopBar from './components/TopBar'
 
-// MeWork 根组件（阶段 1 scaffold 骨架）
-// 1.3：contextBridge 链路 fs:ping 连通自检。
-// 1.4：主题 token 地基——浅/深两套 CSS 变量 + 手动切换按钮（阶段 6 扩展跟随系统）。
-// 编辑器（3.x）、标签页（7.x）等后续阶段在此扩展。
+// MeWork 根组件（阶段 2：工作区引导与主壳路由）
+// 状态机：无激活工作区 → Onboarding（首次引导）；有激活 → 主壳（顶栏 + 内容占位）。
+// 启动时 restore() 尝试恢复上次工作区（PRD §4.1.2 / §4.1.4 有效性校验）。
 export default function App() {
-  const [ping, setPing] = useState(null)
   const { theme, toggleTheme } = useTheme()
+  const workspace = useWorkspace()
 
   useEffect(() => {
-    // 验证 contextBridge 链路：渲染进程 → preload → 主进程 → 返回
-    window.mework
-      .ping()
-      .then((res) => {
-        setPing({ ok: true, pong: res.pong })
-        console.log('[ping] fs:ping 连通, pong =', res.pong)
-      })
-      .catch((err) => {
-        setPing({ ok: false, error: String(err) })
-        console.error('[ping] fs:ping 失败:', err)
-      })
+    // 启动恢复：有记忆路径则尝试激活；失败（路径失效）时停留在引导态
+    workspace.restore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 无激活工作区 → 首次引导
+  if (workspace.state === 'idle') {
+    return (
+      <div className="app">
+        <Onboarding workspace={workspace} />
+      </div>
+    )
+  }
+
+  // 有激活工作区 → 主壳（编辑器 / 目录树后续阶段填充）
   return (
     <div className="app">
-      <header className="app__topbar">
-        <span className="app__title">MeWork</span>
-        <button
-          type="button"
-          className="app__theme-toggle"
-          onClick={toggleTheme}
-          aria-label="切换明暗主题"
-          title="切换明暗主题"
-        >
-          {theme === 'light' ? '🌙 深色' : '☀️ 浅色'}
-        </button>
-      </header>
+      <TopBar workspace={workspace} theme={theme} onToggleTheme={toggleTheme} />
       <main className="app__content">
         <div className="app__status">
-          <p className="app__hint">阶段 1 · scaffold 骨架已就绪</p>
-          {ping === null ? (
-            <p className="app__ping app__ping--pending">fs:ping …</p>
-          ) : ping.ok ? (
-            <p className="app__ping app__ping--ok">fs:ping 连通 ✓（{ping.pong}）</p>
-          ) : (
-            <p className="app__ping app__ping--err">fs:ping 失败：{ping.error}</p>
-          )}
+          <p className="app__hint">工作区已就绪</p>
+          <p className="app__workspace-path">{workspace.activePath}</p>
         </div>
       </main>
     </div>

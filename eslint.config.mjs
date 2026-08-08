@@ -2,6 +2,7 @@
 // 约定：不额外引入运行时 lint 负担；未定义变量与无意义的表达式直接报错。
 import js from '@eslint/js'
 import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default [
   { ignores: ['node_modules', 'out', 'dist', 'release'] },
@@ -26,7 +27,7 @@ export default [
   // 渲染进程（浏览器 + React JSX）
   {
     files: ['src/**/*.{js,jsx}'],
-    plugins: { react },
+    plugins: { react, 'react-hooks': reactHooks },
     settings: { react: { version: 'detect' } },
     languageOptions: {
       ecmaVersion: 'latest',
@@ -43,7 +44,9 @@ export default [
       ...js.configs.recommended.rules,
       ...react.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off', // React 19 自动 JSX runtime
-      'react/prop-types': 'off' // 本阶段无 TS/PropTypes 约定
+      'react/prop-types': 'off', // 本阶段无 TS/PropTypes 约定
+      'react-hooks/rules-of-hooks': 'error', // Hooks 调用规则（顶层 / 条件）
+      'react-hooks/exhaustive-deps': 'warn' // 依赖数组完整性提示
     }
   },
 
