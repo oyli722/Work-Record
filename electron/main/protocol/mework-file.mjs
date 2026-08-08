@@ -47,8 +47,12 @@ export function registerMeworkFileScheme() {
 export function registerMeworkFileHandler() {
   protocol.handle(SCHEME, async (request) => {
     // mework-file://img/<encoded relPath> → pathname 去掉前导 /
-    const url = new URL(request.url)
-    const relPath = decodeURIComponent(url.pathname).replace(/^\/+/, '')
+    let relPath
+    try {
+      relPath = decodeURIComponent(new URL(request.url).pathname).replace(/^\/+/, '')
+    } catch {
+      return new Response('bad request', { status: 400 }) // 畸形 % 序列（评审 S1）
+    }
     if (!relPath) return new Response('bad request', { status: 400 })
     try {
       const buffer = await getActiveFs().readFileRaw(relPath)

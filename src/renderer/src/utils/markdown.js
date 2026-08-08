@@ -31,9 +31,11 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
     : self.renderToken(tokens, idx, options)
 }
 
-// DOMPurify URI 白名单：默认协议外追加 mework-file（3.5 本地图，否则 src 会被清理）
+// DOMPurify URI 白名单：官方语义 + 追加 mework-file（3.5 本地图，否则 src 会被清理）。
+// 第三分支保留官方「冒号排除」语义（[^a-z+.-:]），阻止 javascript:/vbscript:/file: 等
+// 危险协议经链接/图片语法注入（评审 P1：先前改写第三分支致 XSS 漏洞）。
 const ALLOWED_URI_REGEXP =
-  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|mework-file):|[^a-z]|[a-z+.-]+(?:[^a-z+]|\/))/i
+  /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|matrix|mework-file):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
 
 /**
  * 将 Markdown 源渲染为经 DOMPurify 清理的 HTML 字符串。
