@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 
 // MeWork 主进程入口
@@ -34,6 +34,16 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // dev 模式透传渲染进程 console 到终端，便于调试（生产构建下不启用）
+  if (isDev) {
+    win.webContents.on('console-message', (_e, level, message) => {
+      const tag = `[renderer:${level}]`
+      if (level === 3) console.error(tag, message)
+      else if (level === 2) console.warn(tag, message)
+      else console.log(tag, message)
+    })
+  }
+
   // 开发模式加载 dev server；生产加载打包产物
   if (isDev && process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -45,6 +55,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerIpcHandlers()
   createWindow()
 
   // macOS 惯例：点击 Dock 图标无窗口时重建（本产品为 Windows 优先，保留惯例）
@@ -57,3 +68,13 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+
+/** 注册 IPC handler（PRD §3.1.2：通道前缀规范 fs: / win: / editor:） */
+function registerIpcHandlers() {
+  // 阶段 1 连通性自检：渲染进程 ping 主进程，验证 contextBridge 链路（PRD §阶段1 交付物）
+  ipcMain.handle('fs:ping', () => ({
+    ok: true,
+    pong: 'pong',
+    ts: Date.now()
+  }))
+}

@@ -50,3 +50,26 @@ body {
 .app__hint {
   opacity: 0.6;
 }
+
+.app__status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.app__ping {
+  font-size: 13px;
+}
+
+.app__ping--pending {
+  opacity: 0.5;
+}
+
+.app__ping--ok {
+  color: #2ea043;
+}
+
+.app__ping--err {
+  color: #d1242f;
+}
