@@ -128,22 +128,138 @@ button {
   cursor: default;
 }
 
-/* 编辑区（3.1 占位 textarea；暖纸阅读面，3.2 换 CodeMirror） */
-.editor__area {
+/* 三态模式切换按钮 */
+.editor__modes {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.editor__mode {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.editor__mode:hover:not(.editor__mode--active) {
+  color: var(--color-text);
+}
+
+.editor__mode--active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* 内容区：三态分屏（编辑 | 预览） */
+.editor__body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.editor__pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor__pane--preview {
+  flex: 1;
+}
+
+.editor__pane--full {
+  flex: 1 1 100%;
+}
+
+.editor__divider {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: var(--color-border-subtle);
+  transition: background-color 0.15s ease;
+}
+
+.editor__divider:hover {
+  background: var(--color-accent);
+}
+
+/* CodeMirror 编辑区（暖纸阅读面；深色由 oneDark 主题接管） */
+.codemirror {
   flex: 1;
   min-height: 0;
-  width: 100%;
-  resize: none;
-  border: none;
+  overflow: hidden;
+}
+
+.codemirror .cm-editor {
+  height: 100%;
+  font-size: var(--font-size-base);
+}
+
+.codemirror .cm-editor.cm-focused {
   outline: none;
+}
+
+.codemirror .cm-scroller {
+  font-family: var(--font-mono);
+  line-height: 1.7;
+}
+
+html[data-theme='light'] .codemirror .cm-editor {
   background: var(--color-paper);
   color: var(--color-paper-text);
+}
+
+html[data-theme='light'] .codemirror .cm-gutters {
+  background: var(--color-paper);
+  color: var(--color-paper-text-secondary);
+  border-right: 1px solid var(--color-paper-border);
+}
+
+html[data-theme='light'] .codemirror .cm-activeLine {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+html[data-theme='light'] .codemirror .cm-activeLineGutter {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+html[data-theme='light'] .codemirror .cm-cursor {
+  border-left-color: var(--color-paper-text);
+}
+
+html[data-theme='light'] .codemirror .cm-selectionBackground,
+html[data-theme='light'] .codemirror .cm-selectionMatch {
+  background: var(--color-accent-subtle) !important;
+}
+
+/* 预览区（3.2 占位：纯文本呈现） */
+.preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-paper);
+  color: var(--color-paper-text);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.preview__text {
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: 1.7;
   padding: var(--space-4) var(--space-6);
+  white-space: pre-wrap;
+  word-break: break-word;
   user-select: text;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .editor__empty {

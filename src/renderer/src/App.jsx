@@ -33,7 +33,7 @@ export default function App() {
         <Sidebar workspace={workspace} editor={editor} />
         <main className="app__main">
           {isActive ? (
-            <EditorPane editor={editor} />
+            <EditorPane editor={editor} theme={theme} />
           ) : isRestoring ? (
             <div className="app__status">
               <p className="app__hint">正在恢复工作区…</p>
