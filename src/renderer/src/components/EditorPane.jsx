@@ -2,7 +2,7 @@
 // 工具栏：文件名 + 三态切换（分屏/仅编辑/仅预览）+ 保存状态 + 保存按钮。
 // 内容区：split 分屏（CodeMirror 编辑 | 预览占位），拖拽分隔条调比例（PRD §4.2.1）。
 // 自动保存 / Ctrl+S 体系随 3.3；预览 markdown 渲染随 3.4。
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
 
@@ -15,6 +15,19 @@ export default function EditorPane({ editor, theme }) {
   const [ratio, setRatio] = useState(50) // 分屏比例（编辑区宽度 %）
   const bodyRef = useRef(null)
   const dragRef = useRef(null) // { startX, startRatio }
+
+  // Ctrl+S 手动保存（PRD §4.2.3；无文件时不注册，避免误触发「尚未打开文件」错误）
+  useEffect(() => {
+    if (!currentFile) return
+    function onKeydown(e) {
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        save()
+      }
+    }
+    window.addEventListener('keydown', onKeydown)
+    return () => window.removeEventListener('keydown', onKeydown)
+  }, [currentFile, save])
 
   /** 开始拖拽分隔条 */
   function onDividerDown(e) {

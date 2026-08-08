@@ -37,7 +37,9 @@ export default [
         window: 'readonly',
         document: 'readonly',
         localStorage: 'readonly',
-        console: 'readonly'
+        console: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly'
       }
     },
     rules: {
