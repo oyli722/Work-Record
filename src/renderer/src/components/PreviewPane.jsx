@@ -1,12 +1,13 @@
-// 预览区（阶段 3.4：markdown-it + DOMPurify 渲染，暖纸阅读面）
-// isMarkdown=false（TXT）退化为纯文本 pre 呈现。图片加载（相对/远程）随 3.5，外链随 3.6。
+// 预览区（阶段 3.4/3.5：markdown-it + DOMPurify 渲染，暖纸阅读面）
+// isMarkdown=false（TXT）退化为纯文本 pre 呈现。
+// 相对图片经 baseDir 解析为 mework-file://（3.5），外链系统打开随 3.6。
 import { useMemo } from 'react'
 import { renderMarkdown } from '../utils/markdown'
 
-export default function PreviewPane({ content, isMarkdown }) {
+export default function PreviewPane({ content, isMarkdown, baseDir }) {
   const html = useMemo(
-    () => (isMarkdown ? renderMarkdown(content) : ''),
-    [content, isMarkdown]
+    () => (isMarkdown ? renderMarkdown(content, baseDir) : ''),
+    [content, isMarkdown, baseDir]
   )
 
   if (!isMarkdown) {

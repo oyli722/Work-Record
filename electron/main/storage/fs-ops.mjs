@@ -26,6 +26,12 @@ export function createFsOps(guard) {
       return readFile(abs, 'utf-8')
     },
 
+    /** 读取文件原始字节（Buffer，预览图片用，mework-file:// 协议，3.5） */
+    async readFileRaw(relPath) {
+      const abs = await safe(relPath)
+      return readFile(abs)
+    },
+
     /** 写入文件（UTF-8 文本）。父目录不存在则递归创建。 */
     async writeFile(relPath, content) {
       const abs = await safe(relPath)

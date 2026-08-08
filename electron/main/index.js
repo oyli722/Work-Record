@@ -2,10 +2,16 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
+import {
+  registerMeworkFileScheme,
+  registerMeworkFileHandler
+} from './protocol/mework-file.mjs'
 
 // MeWork 主进程入口
 // 安全基线（PRD §3.2.1）：contextIsolation:true、nodeIntegration:false、sandbox:true
 // 所有 fs 操作统一经 electron/main/storage/fs-ops.mjs（内部经 pathGuard 沙箱，PRD §7.1）。
+// 自定义协议特权须在 app ready 前声明（3.5：mework-file:// 预览图片）
+registerMeworkFileScheme()
 
 const isDev = !app.isPackaged
 
@@ -61,6 +67,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerIpcHandlers()
+  registerMeworkFileHandler() // mework-file:// 协议（3.5 预览图片）
   createWindow()
 
   // macOS 惯例：点击 Dock 图标无窗口时重建（本产品为 Windows 优先，保留惯例）

@@ -9,9 +9,17 @@ import PreviewPane from './PreviewPane'
 const MIN_RATIO = 15
 const MAX_RATIO = 85
 
+/** 相对路径的目录部分（工作区内，'/' 分隔） */
+function dirOf(relPath) {
+  const i = relPath.lastIndexOf('/')
+  return i === -1 ? '' : relPath.slice(0, i)
+}
+
 export default function EditorPane({ editor, theme }) {
   const { currentFile, content, saveState, dirty, error, loading, setContent, save } = editor
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
+  // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
+  const baseDir = dirOf(currentFile ?? '')
   const [mode, setMode] = useState('split') // split | edit | preview
   const [ratio, setRatio] = useState(50) // 分屏比例（编辑区宽度 %）
   const bodyRef = useRef(null)
@@ -94,7 +102,7 @@ export default function EditorPane({ editor, theme }) {
           <div className="editor__body" ref={bodyRef}>
             {mode === 'preview' ? (
               <div className="editor__pane editor__pane--preview editor__pane--full">
-                <PreviewPane content={content} isMarkdown={isMarkdown} />
+                <PreviewPane content={content} isMarkdown={isMarkdown} baseDir={baseDir} />
               </div>
             ) : (
               <div
@@ -114,7 +122,7 @@ export default function EditorPane({ editor, theme }) {
                   title="拖拽调整分屏比例"
                 />
                 <div className="editor__pane editor__pane--preview">
-                  <PreviewPane content={content} isMarkdown={isMarkdown} />
+                  <PreviewPane content={content} isMarkdown={isMarkdown} baseDir={baseDir} />
                 </div>
               </>
             )}
