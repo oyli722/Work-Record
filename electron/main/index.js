@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
+import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 
 // MeWork 主进程入口
 // 安全基线（PRD §3.2.1）：contextIsolation:true、nodeIntegration:false、sandbox:true
@@ -84,4 +85,6 @@ function registerIpcHandlers() {
 
   // 阶段 2 受控 fs API（PRD §7.1：统一经 fs-ops + pathGuard）
   registerFsHandlers()
+  // 阶段 2 工作区激活 / 切换 / 查询（PRD §4.1）
+  registerWorkspaceHandlers()
 }

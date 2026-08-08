@@ -24,6 +24,13 @@ const api = {
     stat: (relPath) => ipcRenderer.invoke('fs:stat', relPath),
     /** 打开系统目录选择对话框，返回选中目录绝对路径或 null（工作区引导用） */
     chooseDirectory: () => ipcRenderer.invoke('fs:choose_directory')
+  },
+
+  /** 工作区管理 API（阶段 2） */
+  workspace: {
+    activate: (absPath) => ipcRenderer.invoke('fs:activate_workspace', absPath),
+    deactivate: () => ipcRenderer.invoke('fs:deactivate_workspace'),
+    status: () => ipcRenderer.invoke('fs:workspace_status')
   }
 }
 
