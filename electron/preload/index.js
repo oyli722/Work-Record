@@ -17,6 +17,11 @@ const api = {
     listDirectory: (relPath) => ipcRenderer.invoke('fs:list_directory', relPath),
     /** 目录树聚合：一次返回目录项 + 类型（[{ name, isDirectory }]，阶段 4.1） */
     listDetail: (relPath) => ipcRenderer.invoke('fs:list_detail', relPath),
+    /** 版本历史（阶段 5）：记录新版本 / 版本列表 / 读取某版本内容 */
+    versionRecord: (relPath, content, editedBy) =>
+      ipcRenderer.invoke('fs:version_record', relPath, content, editedBy),
+    versionList: (relPath) => ipcRenderer.invoke('fs:version_list', relPath),
+    versionRead: (relPath, versionId) => ipcRenderer.invoke('fs:version_read', relPath, versionId),
     mkdir: (relPath) => ipcRenderer.invoke('fs:mkdir', relPath),
     rename: (relFrom, relTo) => ipcRenderer.invoke('fs:rename', relFrom, relTo),
     /** 重命名并迁移版本库（阶段 4.3：.wr/versions 前缀递归迁移） */

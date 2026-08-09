@@ -3,6 +3,7 @@ import { join } from 'path'
 import { isExternalLink } from '../../src/shared/link-policy'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
+import { registerVersionHandlers } from './ipc/version-handlers.mjs'
 import {
   registerMeworkFileScheme,
   registerMeworkFileHandler
@@ -110,6 +111,8 @@ function registerIpcHandlers() {
   registerFsHandlers()
   // 阶段 2 工作区激活 / 切换 / 查询（PRD §4.1）
   registerWorkspaceHandlers()
+  // 阶段 5 版本历史（PRD §4.5：快照 / 列表 / 读取）
+  registerVersionHandlers()
 
   // 阶段 3.6 外链（PRD §4.4.3）：渲染进程请求用系统浏览器/默认程序打开链接。
   // 协议白名单经 src/shared/link-policy.js（用户定案 http/https/mailto/tel，评审 S3 单一来源）；
