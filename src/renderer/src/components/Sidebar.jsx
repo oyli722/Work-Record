@@ -154,7 +154,7 @@ export default function Sidebar({
 
   /** 生成不冲突的最终名（同目录重名自动加序号，如「未命名 2.md」） */
   async function uniqueName(parentRelPath, name) {
-    const items = await window.mework.fs.listDetail(parentRelPath)
+    const items = await window.mework.fs.listDetail(parentRelPath || '.') // 根目录用 '.'（空路径被 pathGuard 拒绝）
     const existing = new Set(items.map((i) => i.name))
     if (!existing.has(name)) return name
     const dot = name.lastIndexOf('.')
@@ -301,7 +301,7 @@ export default function Sidebar({
   /** 递归刷新目录树（保留展开状态，感知外部改动；4.5，PRD §4.3.6）。
       磁盘中已删除的节点移除、新增的项追加；已展开的文件夹递归刷新子级。 */
   async function refreshTreeNodes(nodes, parentRelPath) {
-    const items = await window.mework.fs.listDetail(parentRelPath)
+    const items = await window.mework.fs.listDetail(parentRelPath || '.') // 根目录用 '.'
     const diskByName = new Map(items.map((i) => [i.name, i]))
     const existing = new Set(nodes.map((n) => n.name))
     const next = []
