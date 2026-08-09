@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
+import { isExternalLink } from '../../src/shared/link-policy'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 import {
@@ -41,6 +42,21 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
     return { action: 'deny' }
+  })
+
+  // 纵深防御（3.6）：阻止渲染进程任何应用内导航。预览文本链接点击已由渲染层拦截并
+  // 经 win:open_external 交给系统（4.4.3），此处兜底；仅放行 dev server 的初始加载。
+  // 评审 S1：origin 精确比较（前缀匹配可被 localhost:5173.evil.com 之类绕过），畸形 URL 一律拦。
+  win.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env.ELECTRON_RENDERER_URL
+    if (devUrl) {
+      try {
+        if (new URL(url).origin === new URL(devUrl).origin) return
+      } catch {
+        /* url 解析失败视为非预期导航，走 preventDefault */
+      }
+    }
+    event.preventDefault()
   })
 
   // dev 模式透传渲染进程 console 到终端，便于调试（生产构建下不启用）
@@ -94,4 +110,21 @@ function registerIpcHandlers() {
   registerFsHandlers()
   // 阶段 2 工作区激活 / 切换 / 查询（PRD §4.1）
   registerWorkspaceHandlers()
+
+  // 阶段 3.6 外链（PRD §4.4.3）：渲染进程请求用系统浏览器/默认程序打开链接。
+  // 协议白名单经 src/shared/link-policy.js（用户定案 http/https/mailto/tel，评审 S3 单一来源）；
+  // 渲染层 DOMPurify 已限 URI 协议，此处是主进程纵深防御（评审 P1 加固思路）。
+  // 图片不受影响，仍在应用内显示（3.5）。评审 S2：await 真实结果，打开失败返回 {ok:false}。
+  ipcMain.handle('win:open_external', async (_e, url) => {
+    if (!isExternalLink(url)) {
+      return { ok: false, reason: 'unsupported-protocol' }
+    }
+    try {
+      await shell.openExternal(url)
+      return { ok: true }
+    } catch (err) {
+      console.error('[main] openExternal 失败:', err)
+      return { ok: false, reason: 'open-failed' }
+    }
+  })
 }

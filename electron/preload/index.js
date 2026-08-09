@@ -28,6 +28,11 @@ const api = {
     activate: (absPath) => ipcRenderer.invoke('fs:activate_workspace', absPath),
     deactivate: () => ipcRenderer.invoke('fs:deactivate_workspace'),
     status: () => ipcRenderer.invoke('fs:workspace_status')
+  },
+
+  /** 系统级操作（阶段 3.6）：外部链接用系统浏览器/默认程序打开（PRD §4.4.3） */
+  win: {
+    openExternal: (url) => ipcRenderer.invoke('win:open_external', url)
   }
 }
 

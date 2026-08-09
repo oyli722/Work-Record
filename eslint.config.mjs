@@ -16,7 +16,8 @@ export default [
       globals: {
         __dirname: 'readonly',
         process: 'readonly',
-        console: 'readonly'
+        console: 'readonly',
+        URL: 'readonly' // Node 全局 URL（评审 S1：will-navigate origin 精确比较）
       }
     },
     rules: {
