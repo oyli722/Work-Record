@@ -52,5 +52,10 @@ export default function useTheme() {
     setMode((m) => (m === 'light' ? 'dark' : m === 'dark' ? 'auto' : 'light'))
   }, [])
 
-  return { theme, mode, cycleTheme }
+  // 8.1 设置页：直接指定主题模式
+  const setThemeMode = useCallback((m) => {
+    if (MODES.includes(m)) setMode(m)
+  }, [])
+
+  return { theme, mode, cycleTheme, setThemeMode }
 }

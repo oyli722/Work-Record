@@ -1,8 +1,9 @@
-// 顶栏（布局定案 2026-08-09）：极简，仅承载全局操作（标题 / 主题切换）。
+// 顶栏（布局定案 2026-08-09）：极简，仅承载全局操作（标题 / 主题切换 / 设置）。
 // 工作区路径与切换已归入侧边栏顶部（Sidebar），此处不再放置工作区信息。
 // 6.1 主题按钮：眼睛图标三态循环（用户定案）——浅色睁眼 / 深色闭眼 / 跟随系统（半睁+指示点）。
 // 3.8 专注模式：浮层顶栏额外传 onExitFocus 时显示「退出专注」按钮。
-export default function TopBar({ mode, onToggleTheme, onExitFocus }) {
+// 8.1 设置入口：齿轮按钮（onOpenSettings 传入时显示）。
+export default function TopBar({ mode, onToggleTheme, onExitFocus, onOpenSettings }) {
   return (
     <header className="topbar">
       <span className="topbar__title">MeWork</span>
@@ -29,7 +30,17 @@ export default function TopBar({ mode, onToggleTheme, onExitFocus }) {
             ⤢
           </button>
         )}
-        {/* 设置入口在阶段 8 落地 */}
+        {onOpenSettings && (
+          <button
+            type="button"
+            className="topbar__settings"
+            onClick={onOpenSettings}
+            aria-label="设置"
+            title="设置"
+          >
+            ⚙
+          </button>
+        )}
       </div>
     </header>
   )

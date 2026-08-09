@@ -213,6 +213,16 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     [doSave]
   )
 
+  /** 保存全部未保存标签（8.1 切换工作区前调用） */
+  const saveAll = useCallback(async () => {
+    for (const tab of tabsRef.current) {
+      if (tab.content !== tab.savedContent) {
+        await doSave(tab.relPath, false, 'save')
+      }
+    }
+    return { ok: true }
+  }, [doSave])
+
   /** 回滚活动标签到指定版本（5.5，独立流程强制落盘 + 记 rollback 版） */
   const rollbackTo = useCallback(async (versionId) => {
     const relPath = activeRef.current
@@ -313,6 +323,7 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     close,
     renameCurrentFile,
     closeIfPathDeleted,
-    rollbackTo
+    rollbackTo,
+    saveAll
   }
 }

@@ -9,6 +9,7 @@ import TopBar from './components/TopBar'
 import Sidebar from './components/Sidebar'
 import EditorPane from './components/EditorPane'
 import FocusOverlay from './components/FocusOverlay'
+import SettingsModal from './components/SettingsModal'
 
 // MeWork 根组件（阶段 2 主壳 + 阶段 3 编辑器/专注模式）
 // 始终渲染主壳（顶栏 + 侧边栏 + 主区），主内容区按工作区状态切换：
@@ -17,10 +18,10 @@ import FocusOverlay from './components/FocusOverlay'
 // 3.8 专注模式（PRD §4.2.7）：focus 时顶栏/侧边栏/编辑器工具条隐藏、主区占满全窗，
 // 悬停边缘经 FocusOverlay 临时唤出；F11 切换（仅工作区激活可用）、Esc 退出。
 export default function App() {
-  const { theme, mode, cycleTheme } = useTheme()
-  const { font } = useFontSettings() // 6.2 字体切换（仅 UI 字体，用户定案）
-  const editorSettings = useEditorSettings()
-  const { settings } = editorSettings
+  const { theme, mode, cycleTheme, setThemeMode } = useTheme()
+  const { font, setFontMode } = useFontSettings() // 6.2 字体切换（仅 UI 字体）
+  const { settings, setAutosaveEnabled, setAutosaveDelayMs, setFontSize } = useEditorSettings()
+  const [settingsOpen, setSettingsOpen] = useState(false) // 8.1 设置弹窗
   const workspace = useWorkspace()
   // 3.9：编辑器设置驱动 editorStore 自动保存；只传必要参数减少耦合（评审 O1），字号经 CSS 变量单独应用
   const editor = useEditor({
@@ -109,7 +110,13 @@ export default function App() {
 
   return (
     <div className={`app${focus ? ' app--focus' : ''}`}>
-      {!focus && <TopBar mode={mode} onToggleTheme={cycleTheme} />}
+      {!focus && (
+        <TopBar
+          mode={mode}
+          onToggleTheme={cycleTheme}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      )}
       <div className="app__body">
         {!focus && (
           <Sidebar
@@ -153,6 +160,23 @@ export default function App() {
           setListError={setListError}
           listLoading={listLoading}
           setListLoading={setListLoading}
+        />
+      )}
+
+      {/* 8.1 设置弹窗（左侧分组导航） */}
+      {settingsOpen && (
+        <SettingsModal
+          themeMode={mode}
+          setThemeMode={setThemeMode}
+          font={font}
+          setFontMode={setFontMode}
+          editorSettings={settings}
+          setAutosaveEnabled={setAutosaveEnabled}
+          setAutosaveDelayMs={setAutosaveDelayMs}
+          setFontSize={setFontSize}
+          workspace={workspace}
+          editor={editor}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>
