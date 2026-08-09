@@ -1,5 +1,6 @@
 import { dialog, ipcMain } from 'electron'
 import { getActiveFs } from '../storage/fs-context.mjs'
+import { writeLog } from '../storage/logger.mjs'
 
 /**
  * IPC fs 受控 API（PRD §3.1.2 前缀规范：fs:）
@@ -29,6 +30,12 @@ export function registerFsHandlers() {
     getActiveFs().deleteWithVersions(relPath)
   ) // 4.4：删除 + 版本库清空
   ipcMain.handle('fs:stat', (_e, relPath) => getActiveFs().stat(relPath))
+
+  // 8.2 渲染层错误上报：仅记录错误级别（用户定案：主进程关键操作不需要日志）
+  ipcMain.handle('fs:log', (_e, level, message) => {
+    if (level === 'error') writeLog('error', String(message ?? ''))
+    return { ok: true }
+  })
 
   // 目录选择：供工作区引导 / 更换使用。返回绝对路径（不作为读写路径，仅授权意图）。
   ipcMain.handle('fs:choose_directory', async (e) => {

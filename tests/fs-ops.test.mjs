@@ -41,6 +41,13 @@ test('writeFile 拒绝穿越写入', async () => {
   await assert.rejects(() => ops.writeFile('../evil.txt', 'x'), /穿越|symlink/)
 })
 
+test('appendFile 追加写入不覆盖（8.2 日志用）', async () => {
+  await ops.appendFile('logs/app.log', 'line1\n')
+  await ops.appendFile('logs/app.log', 'line2\n')
+  const content = await ops.readFile('logs/app.log')
+  assert.equal(content, 'line1\nline2\n')
+})
+
 test('listDirectory 列出顶层目录项', async () => {
   const items = await ops.listDirectory('.')
   assert.ok(items.includes('a.txt'))

@@ -1,4 +1,4 @@
-import { readFile, writeFile, readdir, mkdir, rename, rm, stat } from 'node:fs/promises'
+import { appendFile as fsAppend, readFile, writeFile, readdir, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { WR_DIR_NAME } from './constants.mjs'
 
@@ -37,6 +37,13 @@ export function createFsOps(guard) {
       const abs = await safe(relPath)
       await mkdir(dirname(abs), { recursive: true })
       await writeFile(abs, content, 'utf-8')
+    },
+
+    /** 追加写入（UTF-8 文本，日志用，8.2）。文件不存在则创建。 */
+    async appendFile(relPath, content) {
+      const abs = await safe(relPath)
+      await mkdir(dirname(abs), { recursive: true })
+      await fsAppend(abs, content, 'utf-8')
     },
 
     /** 列出目录项（名称数组）。仅顶层，不递归（递归由目录树阶段负责）。

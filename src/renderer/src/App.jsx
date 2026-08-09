@@ -44,6 +44,22 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 8.2 渲染层错误上报：未捕获错误 / 未处理拒绝写主进程日志（PRD §5.4）
+  useEffect(() => {
+    function onError(e) {
+      window.mework?.log?.('error', `renderer error: ${e?.message ?? e}`)
+    }
+    function onRejection(e) {
+      window.mework?.log?.('error', `renderer unhandledrejection: ${e?.reason ?? e}`)
+    }
+    window.addEventListener('error', onError)
+    window.addEventListener('unhandledrejection', onRejection)
+    return () => {
+      window.removeEventListener('error', onError)
+      window.removeEventListener('unhandledrejection', onRejection)
+    }
+  }, [])
+
   // 3.9 编辑器字号：设 CSS 变量 --font-size-editor，CodeMirror 编辑区引用（仅编辑区，预览阅读面不动）
   useEffect(() => {
     document.documentElement.style.setProperty('--font-size-editor', `${settings.fontSize}px`)

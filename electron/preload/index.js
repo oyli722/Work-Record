@@ -10,6 +10,9 @@ const api = {
   /** 连通性自检：渲染进程 → 主进程 ping 往返（阶段 1） */
   ping: () => ipcRenderer.invoke('fs:ping'),
 
+  /** 错误日志上报（8.2，PRD §5.4）：写主进程日志 */
+  log: (level, message) => ipcRenderer.invoke('fs:log', level, message),
+
   /** 文件系统受控 API（阶段 2，全部经主进程 pathGuard 沙箱） */
   fs: {
     readFile: (relPath) => ipcRenderer.invoke('fs:read_file', relPath),
