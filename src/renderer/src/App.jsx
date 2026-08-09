@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useTheme from './hooks/useTheme'
 import useEditorSettings from './hooks/useEditorSettings'
+import useFontSettings, { FONT_STACKS } from './hooks/useFontSettings'
 import useWorkspace from './stores/workspaceStore'
 import useEditor from './stores/editorStore'
 import WorkspaceEmpty from './components/WorkspaceEmpty'
@@ -17,6 +18,7 @@ import FocusOverlay from './components/FocusOverlay'
 // 悬停边缘经 FocusOverlay 临时唤出；F11 切换（仅工作区激活可用）、Esc 退出。
 export default function App() {
   const { theme, mode, cycleTheme } = useTheme()
+  const { font } = useFontSettings() // 6.2 字体切换（仅 UI 字体，用户定案）
   const editorSettings = useEditorSettings()
   const { settings } = editorSettings
   const workspace = useWorkspace()
@@ -45,6 +47,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--font-size-editor', `${settings.fontSize}px`)
   }, [settings.fontSize])
+
+  // 6.2 字体切换：设 --font-ui（仅 UI 字体；编辑器保持等宽 --font-mono）
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-ui', FONT_STACKS[font])
+  }, [font])
 
   const isActive = workspace.state === 'active'
   // 激活中（启动恢复 / 切换）：显示恢复提示，避免首帧误显「选择工作区」（评审 S4）
