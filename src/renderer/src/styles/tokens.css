@@ -3,7 +3,9 @@
    设计基调：仿 Apple——中性低饱和、强调色克制、充足留白（3.4.1 / 3.4.2）。
    - 浅色 :root
    - 深色 [data-theme='dark']
-   阶段 6 将补「跟随系统」与字体切换（4.6.2 / 4.6.4），本阶段先落地两套 + 手动切换。 */
+   阶段 6 已落地「跟随系统」与字体切换（4.6.2 / 4.6.4）：
+   useTheme 三态（浅/深/auto）驱动 data-theme；useFontSettings 三选（Inter/系统/等宽）覆盖 --font-ui，
+   汉字随字体回退系统中文方案（PingFang SC / Microsoft YaHei）。见 hooks/useTheme.js / useFontSettings.js。 */
 
 :root {
   color-scheme: light;
