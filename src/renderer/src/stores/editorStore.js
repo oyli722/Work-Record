@@ -27,7 +27,7 @@ function createTab(relPath, content) {
     relPath,
     content,
     savedContent: content,
-    diskSnapshot: content,
+    diskStat: null, // { mtimeMs, size } 外部改动检测快照（8.4，替代全量内容比对）
     saveState: 'saved', // saved | saving | dirty
     error: null,
     loading: false,
@@ -56,22 +56,32 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     if (tab.content === tab.savedContent) return { ok: true } // 无变化不写盘（PRD §4.5.2）
     if (!force) {
       try {
-        const disk = await window.mework.fs.readFile(relPath)
-        if (disk !== tab.diskSnapshot) {
+        // 8.4：stat mtime/size 快照比对（评审 S2：替代全量 readFile，大文件显著降 IO）
+        const s = await window.mework.fs.stat(relPath)
+        const snap = tab.diskStat
+        if (snap && (s.mtimeMs !== snap.mtimeMs || s.size !== snap.size)) {
           updateTab(relPath, (t) => ({ ...t, externalChange: true }))
           return { ok: false, externalChange: true } // 磁盘被外部修改（4.5）
         }
       } catch {
-        /* 读磁盘失败（外部删除等）：继续保存 */
+        /* stat 失败（外部删除等）：继续保存 */
       }
     }
     updateTab(relPath, (t) => ({ ...t, saveState: 'saving' }))
     try {
       await window.mework.fs.writeFile(relPath, tab.content)
+      // 8.4：写盘后更新磁盘 stat 快照
+      let statInfo = null
+      try {
+        const s = await window.mework.fs.stat(relPath)
+        statInfo = { mtimeMs: s.mtimeMs, size: s.size }
+      } catch {
+        /* stat 失败：diskStat 保持 null */
+      }
       updateTab(relPath, (t) => ({
         ...t,
         savedContent: t.content,
-        diskSnapshot: t.content,
+        diskStat: statInfo,
         externalChange: false,
         saveState: t.content === tab.content ? 'saved' : 'dirty'
       }))
@@ -123,10 +133,18 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     setActiveRelPath(relPath)
     try {
       const text = await window.mework.fs.readFile(relPath)
+      // 8.4：记录磁盘 stat 快照（外部改动检测，免全量读）
+      let statInfo = null
+      try {
+        const s = await window.mework.fs.stat(relPath)
+        statInfo = { mtimeMs: s.mtimeMs, size: s.size }
+      } catch {
+        /* stat 失败：diskStat 保持 null，检测时保守跳过 */
+      }
       setTabs((ts) =>
         ts.map((t) =>
           t.relPath === relPath
-            ? { ...t, content: text, savedContent: text, diskSnapshot: text, loading: false }
+            ? { ...t, content: text, savedContent: text, diskStat: statInfo, loading: false }
             : t
         )
       )
@@ -213,15 +231,20 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     [doSave]
   )
 
-  /** 保存全部未保存标签（8.1 切换工作区前调用） */
-  const saveAll = useCallback(async () => {
-    for (const tab of tabsRef.current) {
-      if (tab.content !== tab.savedContent) {
-        await doSave(tab.relPath, false, 'save')
+  /** 保存全部未保存标签（8.1 切换工作区前调用）。
+      遇外部改动（未 force）返回 externalChange，由调用方确认覆盖或中止（评审 P1）。 */
+  const saveAll = useCallback(
+    async (force = false) => {
+      for (const tab of tabsRef.current) {
+        if (tab.content !== tab.savedContent) {
+          const r = await doSave(tab.relPath, force, 'save')
+          if (!force && r.externalChange) return { ok: false, externalChange: true }
+        }
       }
-    }
-    return { ok: true }
-  }, [doSave])
+      return { ok: true }
+    },
+    [doSave]
+  )
 
   /** 回滚活动标签到指定版本（5.5，独立流程强制落盘 + 记 rollback 版） */
   const rollbackTo = useCallback(async (versionId) => {
@@ -231,10 +254,18 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
       const { content } = await window.mework.fs.versionRead(relPath, versionId)
       updateTab(relPath, (t) => ({ ...t, content }))
       await window.mework.fs.writeFile(relPath, content)
+      // 8.4：回滚后更新磁盘 stat 快照
+      let statInfo = null
+      try {
+        const s = await window.mework.fs.stat(relPath)
+        statInfo = { mtimeMs: s.mtimeMs, size: s.size }
+      } catch {
+        /* stat 失败 */
+      }
       updateTab(relPath, (t) => ({
         ...t,
         savedContent: content,
-        diskSnapshot: content,
+        diskStat: statInfo,
         externalChange: false,
         saveState: 'saved'
       }))

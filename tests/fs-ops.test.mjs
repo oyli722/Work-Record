@@ -136,8 +136,11 @@ test('delete 删除文件与递归目录', async () => {
   await assert.rejects(() => ops.stat('del-dir'), /ENOENT/)
 })
 
-test('stat 报告存在性与类型', async () => {
-  assert.equal((await ops.stat('a.txt')).isFile, true)
+test('stat 报告存在性/类型/修改时间/大小（8.4 外部改动检测用）', async () => {
+  const s = await ops.stat('a.txt')
+  assert.equal(s.isFile, true)
   assert.equal((await ops.stat('sub')).isDirectory, true)
+  assert.equal(typeof s.mtimeMs, 'number')
+  assert.equal(typeof s.size, 'number')
   await assert.rejects(() => ops.stat('nope.txt'), /ENOENT/)
 })

@@ -122,11 +122,17 @@ export function createFsOps(guard) {
       }
     },
 
-    /** 查询路径状态（存在性 / 类型），供 UI 判断。 */
+    /** 查询路径状态（存在性 / 类型 / 修改时间 / 大小），供 UI 判断与外部改动检测（8.4）。 */
     async stat(relPath) {
       const abs = await safe(relPath)
       const info = await stat(abs)
-      return { exists: true, isDirectory: info.isDirectory(), isFile: info.isFile() }
+      return {
+        exists: true,
+        isDirectory: info.isDirectory(),
+        isFile: info.isFile(),
+        mtimeMs: info.mtimeMs,
+        size: info.size
+      }
     }
   }
 }

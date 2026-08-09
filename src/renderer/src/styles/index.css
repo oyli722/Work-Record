@@ -1351,6 +1351,14 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   color: var(--color-accent);
   background: var(--color-accent-subtle);
 }
+.settings__nav-item--disabled {
+  color: var(--color-text-tertiary); /* AI 组灰显（PRD §4.8.6，评审 O3） */
+  cursor: default;
+}
+.settings__nav-item--disabled:hover {
+  color: var(--color-text-tertiary);
+  background: none;
+}
 .settings__content {
   flex: 1;
   padding: var(--space-4);

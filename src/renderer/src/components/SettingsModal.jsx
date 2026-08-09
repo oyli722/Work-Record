@@ -3,6 +3,7 @@
 // 编辑器：自动保存开关 / 防抖间隔 / 字号；工作区：当前路径 + 更换；
 // AI：灰色预留「将在未来版本中提供」；关于：产品信息。
 import { useState } from 'react'
+import ConfirmDialog from './ConfirmDialog'
 
 const GROUPS = [
   { id: 'appearance', label: '外观' },
@@ -34,15 +35,30 @@ export default function SettingsModal({
     </label>
   )
 
-  /** 更换工作区（8.1）：先保存全部未保存标签，再切换并清空标签 */
+  /** 更换工作区（8.1）：先保存全部未保存标签，再切换并清空标签。
+      遇外部改动（评审 P1）：需用户确认强制覆盖后切换，或中止。 */
+  const [switchConfirm, setSwitchConfirm] = useState(null) // 待切换目标路径（外部改动确认）
   async function handleChangeWorkspace() {
     const absPath = await window.mework.fs.chooseDirectory()
     if (!absPath) return
-    await editor.saveAll() // 保存未保存标签，避免切换丢数据
+    const r = await editor.saveAll()
+    if (r.externalChange) {
+      setSwitchConfirm(absPath) // 有标签磁盘被外部修改：需确认覆盖后再切换
+      return
+    }
+    await doSwitch(absPath)
+  }
+  async function doSwitch(absPath) {
     await workspace.deactivate()
     const res = await workspace.activate(absPath)
     editor.close()
-    if (res.ok) onClose() // 切换成功关闭设置
+    if (res.ok) onClose()
+  }
+  async function handleSwitchOverwrite() {
+    const absPath = switchConfirm
+    setSwitchConfirm(null)
+    await editor.saveAll(true) // 强制覆盖外部改动
+    await doSwitch(absPath)
   }
 
   return (
@@ -65,8 +81,11 @@ export default function SettingsModal({
               <button
                 key={g.id}
                 type="button"
-                className={`settings__nav-item${group === g.id ? ' settings__nav-item--active' : ''}`}
+                className={`settings__nav-item${group === g.id ? ' settings__nav-item--active' : ''}${
+                  g.id === 'ai' ? ' settings__nav-item--disabled' : ''
+                }`}
                 onClick={() => setGroup(g.id)}
+                title={g.id === 'ai' ? '将在未来版本中提供' : undefined}
               >
                 {g.label}
               </button>
@@ -148,6 +167,19 @@ export default function SettingsModal({
           </div>
         </div>
       </div>
+
+      {/* 8.4 评审 P1：切换工作区遇外部改动，需确认强制覆盖 */}
+      {switchConfirm && (
+        <ConfirmDialog
+          title="切换工作区"
+          message="有文件已被外部修改，保存被阻止。"
+          warning="强制覆盖将保存当前编辑内容并切换工作区；取消则中止切换。"
+          confirmLabel="强制覆盖并切换"
+          confirmDanger={false}
+          onConfirm={handleSwitchOverwrite}
+          onCancel={() => setSwitchConfirm(null)}
+        />
+      )}
     </div>
   )
 }
