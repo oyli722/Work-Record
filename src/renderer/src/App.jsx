@@ -3,7 +3,7 @@ import useTheme from './hooks/useTheme'
 import useEditorSettings from './hooks/useEditorSettings'
 import useFontSettings, { FONT_STACKS } from './hooks/useFontSettings'
 import useWorkspace from './stores/workspaceStore'
-import useEditor from './stores/editorStore'
+import useEditor, { readOpenTabs, OPEN_TABS_KEY } from './stores/editorStore'
 import WorkspaceEmpty from './components/WorkspaceEmpty'
 import TopBar from './components/TopBar'
 import Sidebar from './components/Sidebar'
@@ -56,6 +56,30 @@ export default function App() {
   const isActive = workspace.state === 'active'
   // 激活中（启动恢复 / 切换）：显示恢复提示，避免首帧误显「选择工作区」（评审 S4）
   const isRestoring = workspace.state === 'activating'
+
+  // 7.4 启动恢复：工作区激活后重新打开上次的标签列表（PRD §4.7.3）。
+  // 串行 await 避免并发竞态（评审 P1）；恢复失败（文件被删）剔除持久化路径（评审 S3）。
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (isActive && !restoredRef.current) {
+      restoredRef.current = true
+      ;(async () => {
+        for (const relPath of readOpenTabs()) {
+          const r = await editor.openFile(relPath)
+          if (!r.ok) {
+            try {
+              localStorage.setItem(
+                OPEN_TABS_KEY,
+                JSON.stringify(readOpenTabs().filter((p) => p !== relPath))
+              )
+            } catch {
+              /* 静默 */
+            }
+          }
+        }
+      })()
+    }
+  }, [isActive, editor])
 
   // ref 镜像最新值：供 capture 键监听（仅创建一次）在稳定闭包下读到当前状态
   const focusRef = useRef(focus)

@@ -9,6 +9,19 @@ import { useCallback, useRef, useState } from 'react'
 // 自动保存防抖间隔默认 30s（由 useEditorSettings 传入，3.9）
 const DEFAULT_DELAY = 30000
 
+// 7.4 打开标签列表持久化（PRD §4.7.3：应用重启恢复）
+export const OPEN_TABS_KEY = 'mework.openTabs'
+
+/** 读取持久化的打开标签列表（供 App 启动恢复） */
+export function readOpenTabs() {
+  try {
+    const list = JSON.parse(localStorage.getItem(OPEN_TABS_KEY) ?? '[]')
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
 function createTab(relPath, content) {
   return {
     relPath,
@@ -117,6 +130,13 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
             : t
         )
       )
+      // 7.4 持久化打开列表（新标签）
+      try {
+        const list = readOpenTabs()
+        if (!list.includes(relPath)) localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...list, relPath]))
+      } catch {
+        /* 静默 */
+      }
       return { ok: true }
     } catch (err) {
       const msg = String(err?.message ?? err)
@@ -143,6 +163,12 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
   const confirmCloseTab = useCallback(
     (relPath) => {
       clearAutosave(relPath)
+      // 7.4 持久化移除关闭的标签
+      try {
+        localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(readOpenTabs().filter((p) => p !== relPath)))
+      } catch {
+        /* 静默 */
+      }
       setTabs((ts) => {
         const idx = ts.findIndex((t) => t.relPath === relPath)
         const next = ts.filter((t) => t.relPath !== relPath)
@@ -211,12 +237,23 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     }
   }, [])
 
-  /** 重命名后同步标签路径（4.3） */
+  /** 重命名后同步标签路径（4.3）+ 持久化列表（7.4 评审 O2：旧路径 → 新路径） */
   const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
     setTabs((ts) => ts.map((t) => (t.relPath === oldRelPath ? { ...t, relPath: newRelPath } : t)))
     if (activeRef.current === oldRelPath) {
       activeRef.current = newRelPath
       setActiveRelPath(newRelPath)
+    }
+    try {
+      const list = readOpenTabs()
+      if (list.includes(oldRelPath)) {
+        localStorage.setItem(
+          OPEN_TABS_KEY,
+          JSON.stringify(list.map((p) => (p === oldRelPath ? newRelPath : p)))
+        )
+      }
+    } catch {
+      /* 静默 */
     }
   }, [])
 
@@ -240,10 +277,15 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     })
   }, [])
 
-  /** 关闭全部标签（切换工作区后调用） */
+  /** 关闭全部标签（切换工作区后调用）；清空持久化打开列表（7.4） */
   const close = useCallback(() => {
     autosaveTimersRef.current.forEach((timer) => clearTimeout(timer))
     autosaveTimersRef.current.clear()
+    try {
+      localStorage.setItem(OPEN_TABS_KEY, '[]')
+    } catch {
+      /* 静默 */
+    }
     setTabs([])
     activeRef.current = null
     setActiveRelPath(null)
