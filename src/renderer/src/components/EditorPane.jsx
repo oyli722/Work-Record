@@ -36,19 +36,28 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
     if (r?.externalChange) setExternalConfirm(true)
   }, [save])
 
-  // 7.2 关闭未保存标签：三选 保存/放弃/取消（7.3 细化外部改动检测）
+  // 7.2/7.3 关闭未保存标签：三选 保存/放弃/取消；「保存」遇外部改动（7.3）→ 覆盖确认后再关
   const [closeRequest, setCloseRequest] = useState(null)
+  const [closeExternalConfirm, setCloseExternalConfirm] = useState(null) // 覆盖确认（关闭流程）
   async function handleCloseSave() {
     const relPath = closeRequest
     setCloseRequest(null)
     editor.activateTab(relPath)
     const r = await save()
-    if (r.ok) editor.confirmCloseTab(relPath) // externalChange：保存被阻止，不关闭
+    if (r.ok) editor.confirmCloseTab(relPath)
+    else if (r.externalChange) setCloseExternalConfirm(relPath) // 磁盘被外部修改：需覆盖确认
   }
   function handleCloseDiscard() {
     const relPath = closeRequest
     setCloseRequest(null)
-    editor.confirmCloseTab(relPath)
+    editor.confirmCloseTab(relPath) // 放弃：丢弃未保存内容，无需写盘检测
+  }
+  async function handleCloseOverwrite() {
+    const relPath = closeExternalConfirm
+    setCloseExternalConfirm(null)
+    editor.activateTab(relPath)
+    const r = await save(true) // 用户确认覆盖外部改动（PRD §4.3.6）
+    if (r.ok) editor.confirmCloseTab(relPath)
   }
 
   // 3.7 分屏同步滚动（PRD §4.2.6）双向联动编排。
@@ -245,6 +254,19 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
         </div>
       )}
       {error && <p className="editor__error">{error}</p>}
+
+      {/* 7.3 关闭流程覆盖确认（磁盘被外部修改时，确认后强制保存并关闭） */}
+      {closeExternalConfirm && (
+        <ConfirmDialog
+          title="保存覆盖提示"
+          message="磁盘中的文件已被外部修改。"
+          warning="保存将覆盖外部改动并关闭标签，是否继续？"
+          confirmLabel="覆盖保存"
+          confirmDanger={false}
+          onConfirm={handleCloseOverwrite}
+          onCancel={() => setCloseExternalConfirm(null)}
+        />
+      )}
 
       {/* 7.2 关闭未保存标签三选（7.3 细化外部改动检测） */}
       {closeRequest && (
