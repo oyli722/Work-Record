@@ -16,7 +16,7 @@ import FocusOverlay from './components/FocusOverlay'
 // 3.8 专注模式（PRD §4.2.7）：focus 时顶栏/侧边栏/编辑器工具条隐藏、主区占满全窗，
 // 悬停边缘经 FocusOverlay 临时唤出；F11 切换（仅工作区激活可用）、Esc 退出。
 export default function App() {
-  const { theme, toggleTheme } = useTheme()
+  const { theme, mode, cycleTheme } = useTheme()
   const editorSettings = useEditorSettings()
   const { settings } = editorSettings
   const workspace = useWorkspace()
@@ -78,7 +78,7 @@ export default function App() {
 
   return (
     <div className={`app${focus ? ' app--focus' : ''}`}>
-      {!focus && <TopBar theme={theme} onToggleTheme={toggleTheme} />}
+      {!focus && <TopBar mode={mode} onToggleTheme={cycleTheme} />}
       <div className="app__body">
         {!focus && (
           <Sidebar
@@ -109,8 +109,8 @@ export default function App() {
       </div>
       {focus && (
         <FocusOverlay
-          theme={theme}
-          onToggleTheme={toggleTheme}
+          mode={mode}
+          onToggleTheme={cycleTheme}
           workspace={workspace}
           editor={editor}
           onExitFocus={() => setFocus(false)}

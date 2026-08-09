@@ -28,7 +28,7 @@ function useHover() {
 }
 
 export default function FocusOverlay({
-  theme,
+  mode,
   onToggleTheme,
   workspace,
   editor,
@@ -66,7 +66,7 @@ export default function FocusOverlay({
         onMouseEnter={topEnter}
         onMouseLeave={topLeave}
       >
-        <TopBar theme={theme} onToggleTheme={onToggleTheme} onExitFocus={onExitFocus} />
+        <TopBar mode={mode} onToggleTheme={onToggleTheme} onExitFocus={onExitFocus} />
       </div>
 
       {/* 侧边栏浮层（覆盖主区左侧，可操作工作区/文件树） */}
