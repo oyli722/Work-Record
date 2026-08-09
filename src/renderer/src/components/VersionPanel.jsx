@@ -20,6 +20,7 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
   const [hidden, setHidden] = useState(false)
   const [confirmRollback, setConfirmRollback] = useState(false) // 回滚确认（5.5）
   const [reloadTick, setReloadTick] = useState(0) // 回滚/变更后刷新列表
+  const [notice, setNotice] = useState(null) // 操作反馈（如导出成功路径，5.6）
 
   useEffect(() => {
     let alive = true
@@ -102,6 +103,21 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
     setReloadTick((t) => t + 1) // 列表出现新 rollback 版
   }
 
+  /** 导出选中版本（5.6）：系统另存为默认 Documents，成功提示路径（5s 自动清除，评审 S2） */
+  async function handleExport() {
+    const vid = selected[0]
+    try {
+      const r = await window.mework.fs.versionExport(relPath, vid)
+      if (!r.ok && !r.canceled) setError(r.error ?? '导出失败')
+      else if (r.ok) {
+        setNotice(`已导出：${r.path}`)
+        setTimeout(() => setNotice(null), 5000)
+      }
+    } catch (err) {
+      setError(String(err?.message ?? err)) // 兜底：IPC reject 不再静默（评审 P1）
+    }
+  }
+
   return (
     <>
       <div
@@ -154,10 +170,11 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
       </div>
 
       <div className="version-panel__footer">
-        <span className="version-panel__hint">
-          {selected.length === 0
-            ? '点击版本选中：选 1 对比当前编辑内容，选 2 对比版本之间'
-            : `已选 ${selected.length} 个版本`}
+        <span className="version-panel__hint" title={notice ?? undefined}>
+          {notice ??
+            (selected.length === 0
+              ? '点击版本选中：选 1 对比当前编辑内容，选 2 对比版本之间'
+              : `已选 ${selected.length} 个版本`)}
         </span>
         <div className="version-panel__actions">
           {/* 5.5 回滚（选中 1 版可用）/ 5.6 导出（下一子阶段启用） */}
@@ -170,7 +187,13 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
           >
             回滚
           </button>
-          <button type="button" className="confirm-dialog__btn" disabled title="5.6 实现">
+          <button
+            type="button"
+            className="confirm-dialog__btn"
+            disabled={selected.length !== 1}
+            title={selected.length === 1 ? '导出选中版本' : '选中 1 个版本后可导出'}
+            onClick={handleExport}
+          >
             导出
           </button>
         </div>

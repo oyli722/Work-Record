@@ -22,6 +22,8 @@ const api = {
       ipcRenderer.invoke('fs:version_record', relPath, content, editedBy),
     versionList: (relPath) => ipcRenderer.invoke('fs:version_list', relPath),
     versionRead: (relPath, versionId) => ipcRenderer.invoke('fs:version_read', relPath, versionId),
+    /** 导出版本为独立文件（阶段 5.6：另存为，默认 Documents） */
+    versionExport: (relPath, versionId) => ipcRenderer.invoke('fs:version_export', relPath, versionId),
     mkdir: (relPath) => ipcRenderer.invoke('fs:mkdir', relPath),
     rename: (relFrom, relTo) => ipcRenderer.invoke('fs:rename', relFrom, relTo),
     /** 重命名并迁移版本库（阶段 4.3：.wr/versions 前缀递归迁移） */
