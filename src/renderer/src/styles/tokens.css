@@ -34,6 +34,12 @@
   --color-warning: #f5a623;
   --color-danger: #ff453a;
   --color-danger-subtle: #ffe5e2;
+  --color-success-subtle: #e6f6ec; /* 新增高亮浅绿（diff 等） */
+
+  /* ---- 语义色：叠加 / 细节（6.4 token 覆盖，消除硬编码） ---- */
+  --color-overlay: rgba(0, 0, 0, 0.35); /* 弹窗遮罩 */
+  --color-on-danger: #ffffff; /* 危险按钮上的文字 */
+  --color-active-line: rgba(0, 0, 0, 0.035); /* 编辑器当前行（浅色） */
 
   /* ---- 阅读面（暖纸色，样式确认 2026-08-09）----
      内容区 / 编辑器 / 预览的基础色，与冷色玻璃外壳形成「桌上摊开笔记」对比。
@@ -68,7 +74,10 @@
   --font-ui:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Inter, 'PingFang SC',
     'Microsoft YaHei', sans-serif;
-  --font-mono: 'SF Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+  /* 等宽字体：含汉字回退（PingFang SC / Microsoft YaHei），与 FONT_STACKS.mono 一致（评审 6.4）
+     编辑器 CodeMirror / 预览代码块 / <pre> 均用此栈，等宽模式下汉字回退系统中文方案（§4.6.4） */
+  --font-mono:
+    'SF Mono', ui-monospace, 'Cascadia Code', Consolas, 'PingFang SC', 'Microsoft YaHei', monospace;
 
   /* ---- 尺寸 ---- */
   --topbar-height: 44px;
@@ -100,6 +109,12 @@
   --color-warning: #ffd60a;
   --color-danger: #ff453a;
   --color-danger-subtle: #4a2a28;
+  --color-success-subtle: rgba(48, 209, 88, 0.2);
+
+  /* 深色叠加 / 细节 */
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-on-danger: #ffffff;
+  --color-active-line: rgba(255, 255, 255, 0.04);
 
   /* 深色阅读面：暖纸色在暗背景下取暖黑（#21201e），与外壳冷黑区分 */
   --color-paper: #21201e;

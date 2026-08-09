@@ -230,11 +230,11 @@ html[data-theme='light'] .codemirror .cm-gutters {
 }
 
 html[data-theme='light'] .codemirror .cm-activeLine {
-  background: rgba(0, 0, 0, 0.035);
+  background: var(--color-active-line);
 }
 
 html[data-theme='light'] .codemirror .cm-activeLineGutter {
-  background: rgba(0, 0, 0, 0.035);
+  background: var(--color-active-line);
 }
 
 html[data-theme='light'] .codemirror .cm-cursor {
@@ -1015,7 +1015,7 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--color-overlay);
 }
 .confirm-dialog {
   width: 320px;
@@ -1062,7 +1062,7 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
 .confirm-dialog__btn--danger {
   background: var(--color-danger);
   border-color: var(--color-danger);
-  color: #fff;
+  color: var(--color-on-danger);
 }
 .confirm-dialog__btn--danger:hover {
   filter: brightness(1.1);
@@ -1251,8 +1251,8 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   word-break: break-word;
 }
 .diffview__row--del .diffview__cell:first-child {
-  background: rgba(255, 69, 58, 0.14); /* 删除：左栏红 */
+  background: var(--color-danger-subtle); /* 删除：左栏红 */
 }
 .diffview__row--add .diffview__cell:last-child {
-  background: rgba(48, 209, 88, 0.14); /* 新增：右栏绿 */
+  background: var(--color-success-subtle); /* 新增：右栏绿 */
 }
