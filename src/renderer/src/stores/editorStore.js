@@ -177,6 +177,30 @@ export default function useEditor({
     }
   }, [])
 
+  /** 回滚到指定版本（5.5，PRD §4.5.6）：恢复内容 + 强制落盘 + 记 rollback 版。
+      独立流程：绕过 doSave 的「无变化跳过」，即使内容与上次保存相同也记 rollback 版（评审 P2）。 */
+  const rollbackTo = useCallback(async (versionId) => {
+    const file = currentFileRef.current
+    if (!file) return { ok: false, error: '尚未打开文件' }
+    try {
+      const { content } = await window.mework.fs.versionRead(file, versionId)
+      contentRef.current = content
+      setContentState(content) // 编辑器内容更新（CodeMirror 外部 value 同步）
+      await window.mework.fs.writeFile(file, content) // 强制落盘
+      savedContentRef.current = content
+      diskSnapshotRef.current = content
+      setExternalChange(false)
+      await window.mework.fs.versionRecord(file, content, 'rollback') // 强制记 rollback 版
+      setSaveState('saved')
+      return { ok: true }
+    } catch (err) {
+      const msg = String(err?.message ?? err)
+      setError(msg)
+      setSaveState('dirty')
+      return { ok: false, error: msg }
+    }
+  }, [])
+
   /** 删除后若当前打开文件受影响则关闭（4.4）：被删文件本身或其所在文件夹被删 */
   const closeIfPathDeleted = useCallback(
     (deletedRelPath) => {
@@ -202,6 +226,7 @@ export default function useEditor({
     save,
     close,
     renameCurrentFile,
-    closeIfPathDeleted
+    closeIfPathDeleted,
+    rollbackTo
   }
 }

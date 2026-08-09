@@ -2,6 +2,7 @@
 // 右侧滑出：版本列表（V{n} + 时间 + 来源标签）+ 选中状态（0/1/2 个）+ 关闭。
 // 5.4 对比模式接入主区；5.5/5.6 回滚/导出按钮在对应子阶段启用（当前禁用占位）。
 import { useEffect, useState } from 'react'
+import ConfirmDialog from './ConfirmDialog'
 
 const SOURCE_LABEL = { save: '保存', auto: '自动保存', rollback: '回滚' }
 
@@ -17,6 +18,8 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
   const [selected, setSelected] = useState([]) // 选中的版本号（0/1/2 个）
   // 用户定案：对比激活（选中版本）时面板向右滑出隐藏，避免遮挡 diff；取消选中自动恢复
   const [hidden, setHidden] = useState(false)
+  const [confirmRollback, setConfirmRollback] = useState(false) // 回滚确认（5.5）
+  const [reloadTick, setReloadTick] = useState(0) // 回滚/变更后刷新列表
 
   useEffect(() => {
     let alive = true
@@ -27,7 +30,7 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
     return () => {
       alive = false
     }
-  }, [relPath])
+  }, [relPath, reloadTick])
 
   // 5.4 选中变化 → 加载对比内容：选 1 对比「当前编辑内容 | 选中版」，选 2 对比两版本间（评审 O3）
   useEffect(() => {
@@ -89,6 +92,16 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
     })
   }
 
+  /** 确认回滚（5.5）：恢复选中版本内容 + 强制落盘 + 记 rollback 版；刷新列表 */
+  async function handleRollback() {
+    const vid = selected[0]
+    setConfirmRollback(false)
+    const r = await editor.rollbackTo(vid)
+    if (!r.ok) setError(r.error)
+    setSelected([]) // 回滚后清选中，对比结束
+    setReloadTick((t) => t + 1) // 列表出现新 rollback 版
+  }
+
   return (
     <>
       <div
@@ -147,8 +160,14 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
             : `已选 ${selected.length} 个版本`}
         </span>
         <div className="version-panel__actions">
-          {/* 5.5 回滚 / 5.6 导出：对应子阶段启用 */}
-          <button type="button" className="confirm-dialog__btn" disabled title="5.5 实现">
+          {/* 5.5 回滚（选中 1 版可用）/ 5.6 导出（下一子阶段启用） */}
+          <button
+            type="button"
+            className="confirm-dialog__btn"
+            disabled={selected.length !== 1}
+            title={selected.length === 1 ? '回滚到选中版本' : '选中 1 个版本后可回滚'}
+            onClick={() => setConfirmRollback(true)}
+          >
             回滚
           </button>
           <button type="button" className="confirm-dialog__btn" disabled title="5.6 实现">
@@ -168,6 +187,18 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
         >
           ◂ 版本
         </button>
+      )}
+
+      {/* 回滚确认（5.5，PRD §4.5.6） */}
+      {confirmRollback && (
+        <ConfirmDialog
+          title="回滚版本"
+          message="确定回滚到选中的版本？"
+          warning="当前编辑内容将被该版本覆盖（未保存的修改会丢失）；回滚将生成一个新的 rollback 版本。"
+          confirmLabel="回滚"
+          onConfirm={handleRollback}
+          onCancel={() => setConfirmRollback(false)}
+        />
       )}
     </>
   )
