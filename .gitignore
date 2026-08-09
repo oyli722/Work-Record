@@ -3,10 +3,14 @@ node_modules/
 
 # ---- 构建产物 ----
 dist/
-build/
+build/*
 out/
 release/
 .vite/
+
+# 应用图标资源（build/ 内白名单入库，8.5）
+!build/icon.png
+!build/generate-icon.mjs
 
 # ---- 打包产物 ----
 *.app
