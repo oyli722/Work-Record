@@ -202,7 +202,7 @@ button {
 
 .codemirror .cm-editor {
   height: 100%;
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-editor, var(--font-size-base)); /* 3.9 编辑器字号可配置 */
 }
 
 .codemirror .cm-editor.cm-focused {

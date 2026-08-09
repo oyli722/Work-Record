@@ -3,20 +3,22 @@
 // （主进程 pathGuard 沙箱，真实落盘 PRD §2.4）。
 // 阶段 3 MVP 为单文档模型；多标签页随阶段 7 引入，本层接口保持可扩展。
 //
-// 保存体系（3.3）：
-//   - 自动保存：编辑后停止输入约 AUTOSAVE_DELAY_MS 触发落盘（防抖，持续输入不触发）
+// 保存体系（3.3 / 3.9）：
+//   - 自动保存：编辑后停止输入约 autosaveDelayMs 触发落盘（防抖，持续输入不触发）
+//   - 自动保存开关关闭时完全禁用定时落盘，仅手动保存（3.9 用户定案）
 //   - 手动保存：按钮 / Ctrl+S 立即落盘，并取消待触发的自动保存
 //   - 内容无变化不写盘（与上次落盘一致则跳过）
 //   - saveState: saved（已保存） → dirty（未保存） → saving（保存中） → saved
 //   - error: 加载 / 保存失败的明确文案（PRD §4.2.5 / §5.4）
+// 3.9 编辑器设置数据层：自动保存开关/防抖间隔来自 useEditorSettings（PRD §4.8.4），
+// 默认开启 + 30s（v1.3 定案），经 App 传入；参数缺省时回退默认。
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 
-// 自动保存防抖间隔：停止编辑约 30 秒后保存。
-// 2026-08-09 用户定案：原 PRD §4.2.2 的 1s 改为 30s（3.9 起编辑器设置可配置）。
-const AUTOSAVE_DELAY_MS = 30000
-
-export default function useEditor() {
+export default function useEditor({
+  autosaveEnabled = true,
+  autosaveDelayMs = 30000
+} = {}) {
   const [currentFile, setCurrentFile] = useState(null) // 当前打开文件（相对工作区根）
   const [content, setContentState] = useState('')
   const [saveState, setSaveState] = useState('saved') // saved | saving | dirty
@@ -58,13 +60,14 @@ export default function useEditor() {
     }
   }, [])
 
-  /** 启动 / 重置自动保存计时（持续编辑时不断推迟） */
+  /** 启动 / 重置自动保存计时（持续编辑时不断推迟）；开关关闭则不启动（3.9） */
   const scheduleAutosave = useCallback(() => {
     clearAutosave()
+    if (!autosaveEnabled) return // 自动保存关闭：完全禁用定时落盘，仅手动保存
     autosaveTimerRef.current = setTimeout(() => {
       doSave() // 定时到期自动保存；无变化时 doSave 内跳过
-    }, AUTOSAVE_DELAY_MS)
-  }, [clearAutosave, doSave])
+    }, autosaveDelayMs)
+  }, [clearAutosave, doSave, autosaveEnabled, autosaveDelayMs])
 
   /** 打开文件：先保存未落盘内容（防丢失），再读取新文件。
       加载失败（被删 / 无权限）给出明确错误（PRD §4.2.5）。 */

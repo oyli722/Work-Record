@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useTheme from './hooks/useTheme'
+import useEditorSettings from './hooks/useEditorSettings'
 import useWorkspace from './stores/workspaceStore'
 import useEditor from './stores/editorStore'
 import WorkspaceEmpty from './components/WorkspaceEmpty'
@@ -16,8 +17,14 @@ import FocusOverlay from './components/FocusOverlay'
 // 悬停边缘经 FocusOverlay 临时唤出；F11 切换（仅工作区激活可用）、Esc 退出。
 export default function App() {
   const { theme, toggleTheme } = useTheme()
+  const editorSettings = useEditorSettings()
+  const { settings } = editorSettings
   const workspace = useWorkspace()
-  const editor = useEditor()
+  // 3.9：编辑器设置驱动 editorStore 自动保存；只传必要参数减少耦合（评审 O1），字号经 CSS 变量单独应用
+  const editor = useEditor({
+    autosaveEnabled: settings.autosaveEnabled,
+    autosaveDelayMs: settings.autosaveDelayMs
+  })
   const [focus, setFocus] = useState(false)
   // 目录树状态提升到 App（3.8 评审 P1）：专注模式主/浮层 Sidebar 共享同一份状态，
   // 避免进出专注时组件实例卸载导致树数据/展开态丢失；阶段 4 目录树演进同样需要状态外移。
@@ -31,6 +38,11 @@ export default function App() {
     workspace.restore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 3.9 编辑器字号：设 CSS 变量 --font-size-editor，CodeMirror 编辑区引用（仅编辑区，预览阅读面不动）
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-size-editor', `${settings.fontSize}px`)
+  }, [settings.fontSize])
 
   const isActive = workspace.state === 'active'
   // 激活中（启动恢复 / 切换）：显示恢复提示，避免首帧误显「选择工作区」（评审 S4）
