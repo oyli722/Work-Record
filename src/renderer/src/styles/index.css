@@ -538,11 +538,26 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
 /* ============ 侧边栏（工作区 + 目录树） ============ */
 
 .sidebar {
+  position: relative; /* resizer 定位（8.3） */
   display: flex;
   flex-direction: column;
   min-width: 0;
   background: var(--color-bg-elevated);
   border-right: 1px solid var(--color-border-subtle);
+}
+
+/* 侧边栏右缘拖拽调宽（8.3） */
+.sidebar__resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+}
+.sidebar__resizer:hover {
+  background: var(--color-accent-subtle);
 }
 
 /* 工作区区（侧边栏顶部） */

@@ -3,13 +3,18 @@
 // 极简文件夹图标置树区顶部、默认收起一键展开/收回；展示嵌套子文件夹，点击整行展开/关闭，
 // 懒加载子级；文件节点点击打开）。阶段 4 在此演进为完整目录树 CRUD。
 // 工作区路径在此显示，顶栏不再承载工作区信息。
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
 import VersionPanel from './VersionPanel'
 
 const DOC_EXT = /\.(md|txt)$/i
+
+// 8.3 侧边栏拖拽调宽：宽度范围 + 默认（--sidebar-width 驱动 grid 列）
+const SIDEBAR_MIN = 160
+const SIDEBAR_MAX = 400
+const SIDEBAR_DEFAULT = 240
 
 /** 相对路径的目录部分（工作区内，'/' 分隔） */
 function dirOf(relPath) {
@@ -33,6 +38,44 @@ export default function Sidebar({
   // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // 8.3 侧边栏拖拽调宽：宽度经 --sidebar-width 变量驱动 grid 列，持久化 localStorage
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const w = Number(localStorage.getItem('mework.sidebarWidth'))
+      return w >= SIDEBAR_MIN && w <= SIDEBAR_MAX ? w : SIDEBAR_DEFAULT
+    } catch {
+      return SIDEBAR_DEFAULT
+    }
+  })
+  const resizeRef = useRef(null) // { startX, startWidth }
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`)
+    try {
+      localStorage.setItem('mework.sidebarWidth', String(sidebarWidth))
+    } catch {
+      /* 静默 */
+    }
+  }, [sidebarWidth])
+
+  function onResizeDown(e) {
+    e.preventDefault()
+    resizeRef.current = { startX: e.clientX, startWidth: sidebarWidth }
+    window.addEventListener('mousemove', onResizeMove)
+    window.addEventListener('mouseup', onResizeUp)
+  }
+  function onResizeMove(e) {
+    const drag = resizeRef.current
+    if (!drag) return
+    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, drag.startWidth + (e.clientX - drag.startX)))
+    setSidebarWidth(next)
+  }
+  function onResizeUp() {
+    resizeRef.current = null
+    window.removeEventListener('mousemove', onResizeMove)
+    window.removeEventListener('mouseup', onResizeUp)
+  }
   // 4.2 目录树右键菜单（阶段 4 CRUD 唯一入口，用户定案）+ 新建中的内联输入
   const [contextMenu, setContextMenu] = useState(null) // { x, y, items }
   const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
@@ -370,6 +413,8 @@ export default function Sidebar({
 
   return (
     <aside className="sidebar">
+      {/* 8.3 右缘拖拽调宽 */}
+      <div className="sidebar__resizer" onMouseDown={onResizeDown} title="拖拽调整侧边栏宽度" />
       {/* 工作区区（侧边栏顶部） */}
       <div className="sidebar__workspace">
         <button
