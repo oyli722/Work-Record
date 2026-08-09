@@ -1,227 +1,256 @@
-// 编辑器数据层（渲染进程，PRD §4.2）
-// 管理当前打开文件、内容、脏标记与保存状态；读写统一经 window.mework.fs
-// （主进程 pathGuard 沙箱，真实落盘 PRD §2.4）。
-// 阶段 3 MVP 为单文档模型；多标签页随阶段 7 引入，本层接口保持可扩展。
-//
-// 保存体系（3.3 / 3.9）：
-//   - 自动保存：编辑后停止输入约 autosaveDelayMs 触发落盘（防抖，持续输入不触发）
-//   - 自动保存开关关闭时完全禁用定时落盘，仅手动保存（3.9 用户定案）
-//   - 手动保存：按钮 / Ctrl+S 立即落盘，并取消待触发的自动保存
-//   - 内容无变化不写盘（与上次落盘一致则跳过）
-//   - saveState: saved（已保存） → dirty（未保存） → saving（保存中） → saved
-//   - error: 加载 / 保存失败的明确文案（PRD §4.2.5 / §5.4）
-// 3.9 编辑器设置数据层：自动保存开关/防抖间隔来自 useEditorSettings（PRD §4.8.4），
-// 默认开启 + 30s（v1.3 定案），经 App 传入；参数缺省时回退默认。
+// 编辑器数据层（渲染进程，PRD §4.2 / §4.7）
+// 阶段 7 多标签：tabs[] 每标签独立 内容/脏标记/保存状态/磁盘快照/自动保存计时/externalChange。
+// 活动标签为 UI 当前展示；打开文件 = 新开标签或激活已有标签（§4.7.1）。
+// 保存体系（3.3/5.2）：自动保存（防抖，每标签计时）、手动保存、无变化不写盘、保存记版。
+// 外部改动检测（4.5）：每标签磁盘快照比对，磁盘被外部修改时保存被阻止并提示（§4.3.6）。
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
-export default function useEditor({
-  autosaveEnabled = true,
-  autosaveDelayMs = 30000
-} = {}) {
-  const [currentFile, setCurrentFile] = useState(null) // 当前打开文件（相对工作区根）
-  const [content, setContentState] = useState('')
-  const [saveState, setSaveState] = useState('saved') // saved | saving | dirty
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [externalChange, setExternalChange] = useState(false) // 磁盘被外部修改，保存被阻止（4.5 评审 P1）
+// 自动保存防抖间隔默认 30s（由 useEditorSettings 传入，3.9）
+const DEFAULT_DELAY = 30000
 
-  // ref 镜像最新值：供回调在稳定闭包下读写（避免 useCallback 依赖链抖动）
-  const currentFileRef = useRef(null)
-  const contentRef = useRef('')
-  const savedContentRef = useRef('')
-  const diskSnapshotRef = useRef('') // 磁盘内容快照（打开/保存时记录，4.5 外部改动检测基准）
-  const autosaveTimerRef = useRef(null)
+function createTab(relPath, content) {
+  return {
+    relPath,
+    content,
+    savedContent: content,
+    diskSnapshot: content,
+    saveState: 'saved', // saved | saving | dirty
+    error: null,
+    loading: false,
+    externalChange: false
+  }
+}
 
-  /** 实际落盘逻辑（自动 / 手动 / 切换前共用）。内容无变化不写盘 → 不记版。
-      force=true 时跳过外部改动检测（用户已在覆盖确认弹窗中拍板）。
-      editedBy 显式传参（5.2，评审 P3）：手动 'save' / 自动 'auto'，落盘成功后记版。 */
-  const doSave = useCallback(async (force = false, editedBy = 'save') => {
-    const file = currentFileRef.current
-    const text = contentRef.current
-    if (!file) return { ok: false, error: '尚未打开文件' }
-    if (text === savedContentRef.current) return { ok: true } // 无变化不写盘（PRD §4.5.2 同源）
-    // 4.5 外部改动检测：磁盘当前内容与快照不一致 → 保存将覆盖外部改动，需确认（PRD §4.3.6）
+export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DEFAULT_DELAY } = {}) {
+  const [tabs, setTabs] = useState([])
+  const [activeRelPath, setActiveRelPath] = useState(null)
+  const tabsRef = useRef(tabs)
+  tabsRef.current = tabs // render 时同步最新值（供回调在稳定闭包下读取）
+  const activeRef = useRef(activeRelPath)
+  activeRef.current = activeRelPath
+  const autosaveTimersRef = useRef(new Map()) // relPath -> timerId（每标签独立计时）
+
+  /** 不可变更新指定标签 */
+  const updateTab = (relPath, updater) => {
+    setTabs((ts) => ts.map((t) => (t.relPath === relPath ? updater(t) : t)))
+  }
+
+  /** 实际落盘（指定标签）。无变化不写盘 → 不记版。force 跳过外部改动检测（覆盖确认后）。 */
+  const doSave = useCallback(async (relPath, force = false, editedBy = 'save') => {
+    const tab = tabsRef.current.find((t) => t.relPath === relPath)
+    if (!tab) return { ok: false, error: '标签不存在' }
+    if (tab.content === tab.savedContent) return { ok: true } // 无变化不写盘（PRD §4.5.2）
     if (!force) {
       try {
-        const disk = await window.mework.fs.readFile(file)
-        if (disk !== diskSnapshotRef.current) {
-          // 评审 P1：外部改动提升为 store 状态，自动/手动保存都被阻止时 UI 统一提示，不再静默丢弃
-          setExternalChange(true)
-          return { ok: false, externalChange: true }
+        const disk = await window.mework.fs.readFile(relPath)
+        if (disk !== tab.diskSnapshot) {
+          updateTab(relPath, (t) => ({ ...t, externalChange: true }))
+          return { ok: false, externalChange: true } // 磁盘被外部修改（4.5）
         }
       } catch {
-        /* 读磁盘失败（文件被外部删除等）：继续保存（writeFile 会重建） */
+        /* 读磁盘失败（外部删除等）：继续保存 */
       }
     }
-    setSaveState('saving')
+    updateTab(relPath, (t) => ({ ...t, saveState: 'saving' }))
     try {
-      await window.mework.fs.writeFile(file, text)
-      savedContentRef.current = text
-      diskSnapshotRef.current = text
-      setExternalChange(false) // 覆盖确认（save(true)）或正常保存后清除（评审 P1/S3）
-      // 5.2 记版：写盘成功后记录（内容无变化已在上方跳过，不记版）；失败静默降级（评审 S3）
+      await window.mework.fs.writeFile(relPath, tab.content)
+      updateTab(relPath, (t) => ({
+        ...t,
+        savedContent: t.content,
+        diskSnapshot: t.content,
+        externalChange: false,
+        saveState: t.content === tab.content ? 'saved' : 'dirty'
+      }))
       try {
-        await window.mework.fs.versionRecord(file, text, editedBy)
+        await window.mework.fs.versionRecord(relPath, tab.content, editedBy) // 记版失败静默（评审 S3）
       } catch {
-        /* 记版失败静默：不影响本次保存，下次保存重试（评审 S3） */
+        /* 记版失败静默降级，下次保存重试 */
       }
-      // 保存期间若有新编辑，保持 dirty，避免「已保存」状态失真丢编辑（评审 P1）
-      setSaveState(contentRef.current === text ? 'saved' : 'dirty')
       return { ok: true }
     } catch (err) {
-      setSaveState('dirty')
       const msg = String(err?.message ?? err)
-      setError(msg) // 保存失败统一提示（评审 S-3.3-1：自动保存失败也应有原因）
+      updateTab(relPath, (t) => ({ ...t, saveState: 'dirty', error: msg }))
       return { ok: false, error: msg }
     }
   }, [])
 
-  /** 取消待触发的自动保存 */
-  const clearAutosave = useCallback(() => {
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current)
-      autosaveTimerRef.current = null
+  /** 取消指定标签的待触发自动保存 */
+  const clearAutosave = useCallback((relPath) => {
+    const old = autosaveTimersRef.current.get(relPath)
+    if (old) clearTimeout(old)
+    autosaveTimersRef.current.delete(relPath)
+  }, [])
+
+  /** 启动/重置指定标签的自动保存计时（开关关闭则不启动，3.9） */
+  const scheduleAutosave = useCallback(
+    (relPath) => {
+      clearAutosave(relPath)
+      if (!autosaveEnabled) return
+      autosaveTimersRef.current.set(
+        relPath,
+        setTimeout(() => {
+          autosaveTimersRef.current.delete(relPath)
+          doSave(relPath, false, 'auto') // 自动保存记 auto 版（5.2）
+        }, autosaveDelayMs)
+      )
+    },
+    [autosaveEnabled, autosaveDelayMs, clearAutosave, doSave]
+  )
+
+  /** 打开文件：已打开则激活；未打开则新开标签并加载（§4.7.1） */
+  const openFile = useCallback(async (relPath) => {
+    if (tabsRef.current.some((t) => t.relPath === relPath)) {
+      setActiveRelPath(relPath)
+      return { ok: true }
+    }
+    setTabs((ts) => [...ts, { ...createTab(relPath, ''), loading: true }])
+    setActiveRelPath(relPath)
+    try {
+      const text = await window.mework.fs.readFile(relPath)
+      setTabs((ts) =>
+        ts.map((t) =>
+          t.relPath === relPath
+            ? { ...t, content: text, savedContent: text, diskSnapshot: text, loading: false }
+            : t
+        )
+      )
+      return { ok: true }
+    } catch (err) {
+      const msg = String(err?.message ?? err)
+      setTabs((ts) => ts.map((t) => (t.relPath === relPath ? { ...t, loading: false, error: msg } : t)))
+      return { ok: false, error: msg }
     }
   }, [])
 
-  /** 启动 / 重置自动保存计时（持续编辑时不断推迟）；开关关闭则不启动（3.9） */
-  const scheduleAutosave = useCallback(() => {
-    clearAutosave()
-    if (!autosaveEnabled) return // 自动保存关闭：完全禁用定时落盘，仅手动保存
-    autosaveTimerRef.current = setTimeout(() => {
-      doSave(false, 'auto') // 定时到期自动保存；无变化时 doSave 内跳过（记 auto 版，5.2）
-    }, autosaveDelayMs)
-  }, [clearAutosave, doSave, autosaveEnabled, autosaveDelayMs])
+  /** 激活标签 */
+  const activateTab = useCallback((relPath) => {
+    if (tabsRef.current.some((t) => t.relPath === relPath)) setActiveRelPath(relPath)
+  }, [])
 
-  /** 打开文件：先保存未落盘内容（防丢失），再读取新文件。
-      加载失败（被删 / 无权限）给出明确错误（PRD §4.2.5）。 */
-  const openFile = useCallback(
-    async (relPath) => {
-      // 切换前若有未保存内容，先落盘；保存失败则中止打开并提示
-      if (currentFileRef.current && contentRef.current !== savedContentRef.current) {
-        const prev = await doSave()
-        if (!prev.ok) {
-          // 评审 P2：externalChange 不由 error 呈现（状态区已有提示），避免 setError(undefined) 清空现场
-          if (!prev.externalChange) setError(prev.error)
-          return { ok: false, error: prev.error }
+  /** 关闭前检查：未保存则需确认（7.3 三选弹窗） */
+  const closeTab = useCallback((relPath) => {
+    const tab = tabsRef.current.find((t) => t.relPath === relPath)
+    return { needsConfirm: !!tab && tab.content !== tab.savedContent }
+  }, [])
+
+  /** 实际关闭标签（放弃未保存内容）；活动标签关闭则激活相邻标签 */
+  const confirmCloseTab = useCallback(
+    (relPath) => {
+      clearAutosave(relPath)
+      setTabs((ts) => {
+        const idx = ts.findIndex((t) => t.relPath === relPath)
+        const next = ts.filter((t) => t.relPath !== relPath)
+        if (activeRef.current === relPath) {
+          const fallback = next[Math.min(idx, next.length - 1)]
+          setActiveRelPath(fallback?.relPath ?? null)
         }
-      }
-      clearAutosave() // 切换文件，取消旧文件待保存计时
-      setLoading(true)
-      setError(null)
-      try {
-        const text = await window.mework.fs.readFile(relPath)
-        currentFileRef.current = relPath
-        contentRef.current = text
-        savedContentRef.current = text
-        diskSnapshotRef.current = text // 打开时磁盘快照（4.5 外部改动检测基准）
-        setCurrentFile(relPath)
-        setContentState(text)
-        setSaveState('saved')
-        return { ok: true }
-      } catch (err) {
-        const msg = String(err?.message ?? err)
-        setError(msg)
-        return { ok: false, error: msg }
-      } finally {
-        setLoading(false)
-      }
+        return next
+      })
     },
-    [doSave, clearAutosave]
+    [clearAutosave]
   )
 
-  /** 编辑内容：更新内容与脏标记；有未保存内容时启动/重置自动保存计时（3.3） */
+  /** 编辑活动标签内容：更新内容与脏标记；有未保存内容时启动/重置自动保存计时 */
   const setContent = useCallback(
     (text) => {
-      contentRef.current = text
-      setContentState(text)
-      const dirty = text !== savedContentRef.current
-      setSaveState(dirty ? 'dirty' : 'saved')
-      if (dirty) scheduleAutosave()
-      else clearAutosave()
+      const relPath = activeRef.current
+      if (!relPath) return
+      updateTab(relPath, (t) => {
+        const dirty = text !== t.savedContent
+        if (dirty) scheduleAutosave(relPath)
+        else clearAutosave(relPath)
+        return { ...t, content: text, saveState: dirty ? 'dirty' : 'saved' }
+      })
     },
     [scheduleAutosave, clearAutosave]
   )
 
-  /** 手动保存（按钮 / Ctrl+S）：取消待保存计时并立即落盘。
-      force=true 跳过外部改动检测（覆盖确认后调用，4.5）；editedBy 默认 'save'（5.2）。 */
+  /** 手动保存活动标签（按钮 / Ctrl+S）；force 跳过外部改动检测（4.5） */
   const save = useCallback(
     async (force = false, editedBy = 'save') => {
-      clearAutosave()
-      const r = await doSave(force, editedBy)
-      if (!r.ok && !r.externalChange) setError(r.error) // externalChange 由 UI 弹确认，不显示错误
+      const relPath = activeRef.current
+      if (!relPath) return { ok: false, error: '尚未打开文件' }
+      const r = await doSave(relPath, force, editedBy)
+      if (!r.ok && !r.externalChange) {
+        const tab = tabsRef.current.find((t) => t.relPath === relPath)
+        if (tab) updateTab(relPath, (t) => ({ ...t, error: r.error }))
+      }
       return r
     },
-    [doSave, clearAutosave]
+    [doSave]
   )
 
-  /** 关闭当前文件（切换工作区后调用，清空编辑器状态） */
-  const close = useCallback(() => {
-    clearAutosave()
-    currentFileRef.current = null
-    contentRef.current = ''
-    savedContentRef.current = ''
-    diskSnapshotRef.current = ''
-    setCurrentFile(null)
-    setContentState('')
-    setSaveState('saved')
-    setError(null)
-  }, [clearAutosave])
-
-  /** 重命名后同步当前文件路径（4.3）：若打开的就是被重命名文件，更新引用避免保存到旧路径 */
-  const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
-    if (currentFileRef.current === oldRelPath) {
-      currentFileRef.current = newRelPath
-      setCurrentFile(newRelPath)
-    }
-  }, [])
-
-  /** 回滚到指定版本（5.5，PRD §4.5.6）：恢复内容 + 强制落盘 + 记 rollback 版。
-      独立流程：绕过 doSave 的「无变化跳过」，即使内容与上次保存相同也记 rollback 版（评审 P2）。 */
+  /** 回滚活动标签到指定版本（5.5，独立流程强制落盘 + 记 rollback 版） */
   const rollbackTo = useCallback(async (versionId) => {
-    const file = currentFileRef.current
-    if (!file) return { ok: false, error: '尚未打开文件' }
+    const relPath = activeRef.current
+    if (!relPath) return { ok: false, error: '尚未打开文件' }
     try {
-      const { content } = await window.mework.fs.versionRead(file, versionId)
-      contentRef.current = content
-      setContentState(content) // 编辑器内容更新（CodeMirror 外部 value 同步）
-      await window.mework.fs.writeFile(file, content) // 强制落盘
-      savedContentRef.current = content
-      diskSnapshotRef.current = content
-      setExternalChange(false)
-      await window.mework.fs.versionRecord(file, content, 'rollback') // 强制记 rollback 版
-      setSaveState('saved')
+      const { content } = await window.mework.fs.versionRead(relPath, versionId)
+      updateTab(relPath, (t) => ({ ...t, content }))
+      await window.mework.fs.writeFile(relPath, content)
+      updateTab(relPath, (t) => ({
+        ...t,
+        savedContent: content,
+        diskSnapshot: content,
+        externalChange: false,
+        saveState: 'saved'
+      }))
+      await window.mework.fs.versionRecord(relPath, content, 'rollback')
       return { ok: true }
     } catch (err) {
       const msg = String(err?.message ?? err)
-      setError(msg)
-      setSaveState('dirty')
+      updateTab(relPath, (t) => ({ ...t, saveState: 'dirty', error: msg }))
       return { ok: false, error: msg }
     }
   }, [])
 
-  /** 删除后若当前打开文件受影响则关闭（4.4）：被删文件本身或其所在文件夹被删 */
-  const closeIfPathDeleted = useCallback(
-    (deletedRelPath) => {
-      const cur = currentFileRef.current
-      if (cur && (cur === deletedRelPath || cur.startsWith(`${deletedRelPath}/`))) close()
-    },
-    [close]
-  )
+  /** 重命名后同步标签路径（4.3） */
+  const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
+    setTabs((ts) => ts.map((t) => (t.relPath === oldRelPath ? { ...t, relPath: newRelPath } : t)))
+    if (activeRef.current === oldRelPath) setActiveRelPath(newRelPath)
+  }, [])
 
-  // 卸载时清理自动保存定时器（未触发的保存不泄漏）
-  useEffect(() => clearAutosave, [clearAutosave])
+  /** 删除后若打开标签受影响则关闭（4.4） */
+  const closeIfPathDeleted = useCallback((deletedRelPath) => {
+    setTabs((ts) => {
+      const next = ts.filter(
+        (t) => !(t.relPath === deletedRelPath || t.relPath.startsWith(`${deletedRelPath}/`))
+      )
+      if (next.length !== ts.length) {
+        if (next.length === 0) setActiveRelPath(null)
+        else if (!next.some((t) => t.relPath === activeRef.current)) setActiveRelPath(next[0].relPath)
+        return next
+      }
+      return ts
+    })
+  }, [])
+
+  /** 关闭全部标签（切换工作区后调用） */
+  const close = useCallback(() => {
+    autosaveTimersRef.current.forEach((timer) => clearTimeout(timer))
+    autosaveTimersRef.current.clear()
+    setTabs([])
+    setActiveRelPath(null)
+  }, [])
+
+  // 活动标签派生状态（UI 直接消费）
+  const activeTab = tabs.find((t) => t.relPath === activeRelPath) ?? null
 
   return {
-    currentFile,
-    content,
-    saveState,
-    dirty: saveState === 'dirty',
-    error,
-    loading,
-    externalChange,
+    tabs,
+    activeRelPath,
+    currentFile: activeTab?.relPath ?? null,
+    content: activeTab?.content ?? '',
+    saveState: activeTab?.saveState ?? 'saved',
+    dirty: activeTab?.saveState === 'dirty',
+    error: activeTab?.error ?? null,
+    loading: activeTab?.loading ?? false,
+    externalChange: activeTab?.externalChange ?? false,
     openFile,
+    activateTab,
+    closeTab,
+    confirmCloseTab,
     setContent,
     save,
     close,

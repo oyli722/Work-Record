@@ -28,6 +28,8 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
   // programmatic 滚动抑制：外部驱动滚动期间不上报（防双向联动回环）
   const progRef = useRef(false)
   const progTimerRef = useRef(0)
+  // 7.1 外部 value 同步抑制（S-3.2-1）：dispatch 替换全文由外部触发，不应当作编辑上报 onChange
+  const suppressChangeRef = useRef(false)
 
   // 暴露给父级：滚动到指定源行（clamp 到文档内；顶部对齐）
   useImperativeHandle(
@@ -60,7 +62,10 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
         EditorView.lineWrapping, // 软换行：长行（含 MD 长段落）自动换行，避免水平滚动
         themeComp.of(theme === 'dark' ? oneDark : []),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) onChangeRef.current(update.state.doc.toString())
+          // 7.1：外部替换（标签切换/加载）抑制 onChange，避免误标 dirty（S-3.2-1）
+          if (update.docChanged && !suppressChangeRef.current) {
+            onChangeRef.current(update.state.doc.toString())
+          }
         })
       ],
       parent: containerRef.current
@@ -87,13 +92,18 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 外部 value 变化同步（自身编辑触发的 value 变化 cur === value，跳过避免环）
+  // 外部 value 变化同步（标签切换/加载）。dispatch 前抑制 onChange（7.1，S-3.2-1），
+  // 外部替换不应当作编辑上报；自身编辑触发的 value 变化 cur === value，跳过避免环。
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
     const cur = view.state.doc.toString()
     if (cur !== value) {
+      suppressChangeRef.current = true
       view.dispatch({ changes: { from: 0, to: cur.length, insert: value } })
+      setTimeout(() => {
+        suppressChangeRef.current = false
+      }, 0)
     }
   }, [value])
 
