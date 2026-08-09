@@ -33,9 +33,10 @@ export default function useEditor({
   const diskSnapshotRef = useRef('') // 磁盘内容快照（打开/保存时记录，4.5 外部改动检测基准）
   const autosaveTimerRef = useRef(null)
 
-  /** 实际落盘逻辑（自动 / 手动 / 切换前共用）。内容无变化不写盘。
-      force=true 时跳过外部改动检测（用户已在覆盖确认弹窗中拍板）。 */
-  const doSave = useCallback(async (force = false) => {
+  /** 实际落盘逻辑（自动 / 手动 / 切换前共用）。内容无变化不写盘 → 不记版。
+      force=true 时跳过外部改动检测（用户已在覆盖确认弹窗中拍板）。
+      editedBy 显式传参（5.2，评审 P3）：手动 'save' / 自动 'auto'，落盘成功后记版。 */
+  const doSave = useCallback(async (force = false, editedBy = 'save') => {
     const file = currentFileRef.current
     const text = contentRef.current
     if (!file) return { ok: false, error: '尚未打开文件' }
@@ -59,6 +60,12 @@ export default function useEditor({
       savedContentRef.current = text
       diskSnapshotRef.current = text
       setExternalChange(false) // 覆盖确认（save(true)）或正常保存后清除（评审 P1/S3）
+      // 5.2 记版：写盘成功后记录（内容无变化已在上方跳过，不记版）；失败静默降级（评审 S3）
+      try {
+        await window.mework.fs.versionRecord(file, text, editedBy)
+      } catch {
+        /* 记版失败静默：不影响本次保存，下次保存重试（评审 S3） */
+      }
       // 保存期间若有新编辑，保持 dirty，避免「已保存」状态失真丢编辑（评审 P1）
       setSaveState(contentRef.current === text ? 'saved' : 'dirty')
       return { ok: true }
@@ -83,7 +90,7 @@ export default function useEditor({
     clearAutosave()
     if (!autosaveEnabled) return // 自动保存关闭：完全禁用定时落盘，仅手动保存
     autosaveTimerRef.current = setTimeout(() => {
-      doSave() // 定时到期自动保存；无变化时 doSave 内跳过
+      doSave(false, 'auto') // 定时到期自动保存；无变化时 doSave 内跳过（记 auto 版，5.2）
     }, autosaveDelayMs)
   }, [clearAutosave, doSave, autosaveEnabled, autosaveDelayMs])
 
@@ -138,11 +145,11 @@ export default function useEditor({
   )
 
   /** 手动保存（按钮 / Ctrl+S）：取消待保存计时并立即落盘。
-      force=true 跳过外部改动检测（覆盖确认后调用，4.5）。 */
+      force=true 跳过外部改动检测（覆盖确认后调用，4.5）；editedBy 默认 'save'（5.2）。 */
   const save = useCallback(
-    async (force = false) => {
+    async (force = false, editedBy = 'save') => {
       clearAutosave()
-      const r = await doSave(force)
+      const r = await doSave(force, editedBy)
       if (!r.ok && !r.externalChange) setError(r.error) // externalChange 由 UI 弹确认，不显示错误
       return r
     },
