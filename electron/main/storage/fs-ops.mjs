@@ -79,6 +79,22 @@ export function createFsOps(guard) {
       await rename(absFrom, absTo)
     },
 
+    /** 重命名并迁移版本库（4.3，PRD §4.3.4）。
+        文件/文件夹重命名后，`.wr/versions/<relFrom>` 整体迁移到 `<relTo>`（文件夹即前缀递归迁移）。
+        版本库目录由阶段 5 填充；当前源不存在则跳过（阶段 4 预留调用，阶段 5 后自动生效）。 */
+    async renameWithVersions(relFrom, relTo) {
+      await this.rename(relFrom, relTo)
+      const from = await safe(`${WR_DIR_NAME}/versions/${relFrom}`)
+      const to = await safe(`${WR_DIR_NAME}/versions/${relTo}`)
+      try {
+        await stat(from)
+      } catch {
+        return // 版本库尚不存在（阶段 5 填充后才生成），无需迁移
+      }
+      await mkdir(dirname(to), { recursive: true })
+      await rename(from, to)
+    },
+
     /** 删除文件或目录。目录递归删除（调用方负责二次确认等保护）。 */
     async delete(relPath) {
       const abs = await safe(relPath)

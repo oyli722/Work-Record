@@ -19,6 +19,9 @@ const api = {
     listDetail: (relPath) => ipcRenderer.invoke('fs:list_detail', relPath),
     mkdir: (relPath) => ipcRenderer.invoke('fs:mkdir', relPath),
     rename: (relFrom, relTo) => ipcRenderer.invoke('fs:rename', relFrom, relTo),
+    /** 重命名并迁移版本库（阶段 4.3：.wr/versions 前缀递归迁移） */
+    renameWithVersions: (relFrom, relTo) =>
+      ipcRenderer.invoke('fs:rename_with_versions', relFrom, relTo),
     delete: (relPath) => ipcRenderer.invoke('fs:delete', relPath),
     stat: (relPath) => ipcRenderer.invoke('fs:stat', relPath),
     /** 打开系统目录选择对话框，返回选中目录绝对路径或 null（工作区引导用） */

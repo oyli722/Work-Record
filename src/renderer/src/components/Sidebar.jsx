@@ -9,6 +9,12 @@ import ContextMenu from './ContextMenu'
 
 const DOC_EXT = /\.(md|txt)$/i
 
+/** 相对路径的目录部分（工作区内，'/' 分隔） */
+function dirOf(relPath) {
+  const i = relPath.lastIndexOf('/')
+  return i === -1 ? '' : relPath.slice(0, i)
+}
+
 export default function Sidebar({
   workspace,
   editor,
@@ -27,6 +33,7 @@ export default function Sidebar({
   // 4.2 目录树右键菜单（阶段 4 CRUD 唯一入口，用户定案）+ 新建中的内联输入
   const [contextMenu, setContextMenu] = useState(null) // { x, y, items }
   const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
+  const [renaming, setRenaming] = useState(null) // 重命名中的节点（4.3）
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -199,6 +206,33 @@ export default function Sidebar({
     setCreating(null)
   }
 
+  /** 开始重命名（4.3）：节点行转内联输入 */
+  function startRename(node) {
+    setContextMenu(null)
+    setRenaming(node)
+  }
+
+  /** 提交重命名：文件/文件夹 + 版本库前缀迁移（PRD §4.3.4）；打开中文件同步新路径 */
+  async function submitRename(rawName) {
+    const node = renaming
+    setRenaming(null)
+    const newName = rawName.trim().replace(/[/\\]/g, '-')
+    if (!newName || newName === node.name) return
+    const parentRelPath = dirOf(node.relPath)
+    const newRelPath = parentRelPath ? `${parentRelPath}/${newName}` : newName
+    try {
+      await window.mework.fs.renameWithVersions(node.relPath, newRelPath)
+      editor.renameCurrentFile(node.relPath, newRelPath) // 打开中的文件同步新路径，避免保存到旧路径
+      await refreshParent(parentRelPath)
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  function cancelRename() {
+    setRenaming(null)
+  }
+
   /** 刷新目标目录的子树（新建/后续 CRUD 后调用） */
   async function refreshParent(parentRelPath) {
     if (parentRelPath === '') {
@@ -330,14 +364,18 @@ export default function Sidebar({
                       node.isDir
                         ? [
                             { label: '新建 MD 文件', onClick: () => startCreate(node.relPath, 'file') },
-                            { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') }
+                            { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') },
+                            { label: '重命名', onClick: () => startRename(node) }
                           ]
-                        : [] // 4.2 文件节点暂无操作（重命名/删除随 4.3/4.4）
+                        : [{ label: '重命名', onClick: () => startRename(node) }]
                     )
                   }
                   creating={creating}
                   onSubmitCreate={submitCreate}
                   onCancelCreate={cancelCreate}
+                  renaming={renaming}
+                  onSubmitRename={submitRename}
+                  onCancelRename={cancelRename}
                 />
               </>
             )}

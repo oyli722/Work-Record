@@ -81,6 +81,21 @@ test('rename 拒绝把文件移到根外', async () => {
   await assert.rejects(() => ops.rename('stay.txt', '../out.txt'), /穿越|symlink/)
 })
 
+test('renameWithVersions 重命名并迁移版本库（源存在时，4.3）', async () => {
+  await ops.writeFile('mv-note.md', 'x')
+  await ops.writeFile('.wr/versions/mv-note.md/V1.md', 'v1') // 模拟阶段 5 版本库
+  await ops.renameWithVersions('mv-note.md', 'renamed.md')
+  assert.equal(await ops.readFile('renamed.md'), 'x') // 文件已移动
+  assert.equal(await ops.readFile('.wr/versions/renamed.md/V1.md'), 'v1') // 版本库已迁移
+  await assert.rejects(() => ops.readFile('.wr/versions/mv-note.md/V1.md'), /ENOENT/) // 旧库已移除
+})
+
+test('renameWithVersions 版本库不存在时跳过（阶段 4 预留调用）', async () => {
+  await ops.writeFile('plain-note.md', 'y')
+  await ops.renameWithVersions('plain-note.md', 'plain-renamed.md') // 不应抛错
+  assert.equal(await ops.readFile('plain-renamed.md'), 'y')
+})
+
 test('delete 删除文件与递归目录', async () => {
   await ops.writeFile('del-file.txt', 'd')
   await ops.delete('del-file.txt')

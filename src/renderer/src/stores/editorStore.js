@@ -137,6 +137,14 @@ export default function useEditor({
     setError(null)
   }, [clearAutosave])
 
+  /** 重命名后同步当前文件路径（4.3）：若打开的就是被重命名文件，更新引用避免保存到旧路径 */
+  const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
+    if (currentFileRef.current === oldRelPath) {
+      currentFileRef.current = newRelPath
+      setCurrentFile(newRelPath)
+    }
+  }, [])
+
   // 卸载时清理自动保存定时器（未触发的保存不泄漏）
   useEffect(() => clearAutosave, [clearAutosave])
 
@@ -150,6 +158,7 @@ export default function useEditor({
     openFile,
     setContent,
     save,
-    close
+    close,
+    renameCurrentFile
   }
 }

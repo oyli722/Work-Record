@@ -21,6 +21,9 @@ export function registerFsHandlers() {
   ipcMain.handle('fs:list_detail', (_e, relPath) => getActiveFs().listDetail(relPath)) // 4.1：目录树聚合
   ipcMain.handle('fs:mkdir', (_e, relPath) => getActiveFs().mkdir(relPath))
   ipcMain.handle('fs:rename', (_e, relFrom, relTo) => getActiveFs().rename(relFrom, relTo))
+  ipcMain.handle('fs:rename_with_versions', (_e, relFrom, relTo) =>
+    getActiveFs().renameWithVersions(relFrom, relTo)
+  ) // 4.3：重命名 + 版本库迁移
   ipcMain.handle('fs:delete', (_e, relPath) => getActiveFs().delete(relPath))
   ipcMain.handle('fs:stat', (_e, relPath) => getActiveFs().stat(relPath))
 
