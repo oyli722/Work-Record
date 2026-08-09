@@ -4,7 +4,8 @@
 // 懒加载子级；文件节点点击打开）。阶段 4 在此演进为完整目录树 CRUD。
 // 工作区路径在此显示，顶栏不再承载工作区信息。
 import { useState } from 'react'
-import FileTree, { FolderIcon } from './FileTree'
+import FileTree, { FolderIcon, InlineInput } from './FileTree'
+import ContextMenu from './ContextMenu'
 
 const DOC_EXT = /\.(md|txt)$/i
 
@@ -23,6 +24,9 @@ export default function Sidebar({
   // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
   const [menuOpen, setMenuOpen] = useState(false)
+  // 4.2 目录树右键菜单（阶段 4 CRUD 唯一入口，用户定案）+ 新建中的内联输入
+  const [contextMenu, setContextMenu] = useState(null) // { x, y, items }
+  const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -130,6 +134,88 @@ export default function Sidebar({
     setListOpen(next)
   }
 
+  /** 右键打开菜单（阶段 4 入口）：工作区未激活 / 空菜单（如 4.2 文件节点暂无操作）不弹 */
+  function openMenu(e, items) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (workspace.state !== 'active' || !items?.length) return
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }
+
+  /** 生成不冲突的最终名（同目录重名自动加序号，如「未命名 2.md」） */
+  async function uniqueName(parentRelPath, name) {
+    const items = await window.mework.fs.listDetail(parentRelPath)
+    const existing = new Set(items.map((i) => i.name))
+    if (!existing.has(name)) return name
+    const dot = name.lastIndexOf('.')
+    const stem = dot > 0 ? name.slice(0, dot) : name
+    const ext = dot > 0 ? name.slice(dot) : ''
+    let i = 2
+    while (existing.has(`${stem} ${i}${ext}`)) i += 1
+    return `${stem} ${i}${ext}`
+  }
+
+  /** 开始新建：目标文件夹未展开则先展开加载，再进入内联输入 */
+  async function startCreate(parentRelPath, type) {
+    setContextMenu(null)
+    setCreating(null)
+    if (parentRelPath !== '') {
+      setTree((t) => updateNode(t, parentRelPath, (n) => ({ ...n, expanded: true, loading: true })))
+      try {
+        const items = await window.mework.fs.listDetail(parentRelPath)
+        const children = buildNodes(items, parentRelPath)
+        setTree((t) => updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, children, error: null })))
+      } catch (err) {
+        setTree((t) =>
+          updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+        )
+      }
+    }
+    setCreating({ parentRelPath, type })
+  }
+
+  /** 提交新建：MD 空文件（自动打开编辑）/ 文件夹；冲突自动序号；刷新父目录（PRD §4.3.3） */
+  async function submitCreate(rawName) {
+    const { parentRelPath, type } = creating
+    setCreating(null)
+    const name = rawName.trim().replace(/[/\\]/g, '-') // 去除路径分隔符，防嵌套
+    if (!name) return
+    try {
+      const finalName = await uniqueName(parentRelPath, name)
+      const relPath = parentRelPath ? `${parentRelPath}/${finalName}` : finalName
+      if (type === 'folder') {
+        await window.mework.fs.mkdir(relPath)
+      } else {
+        await window.mework.fs.writeFile(relPath, '') // 空文件（用户定案）
+        await editor.openFile(relPath) // 新建 MD 自动打开（用户定案）
+      }
+      await refreshParent(parentRelPath)
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  function cancelCreate() {
+    setCreating(null)
+  }
+
+  /** 刷新目标目录的子树（新建/后续 CRUD 后调用） */
+  async function refreshParent(parentRelPath) {
+    if (parentRelPath === '') {
+      await loadRoot()
+      return
+    }
+    try {
+      const items = await window.mework.fs.listDetail(parentRelPath)
+      const children = buildNodes(items, parentRelPath)
+      setTree((t) =>
+        updateNode(t, parentRelPath, (n) => ({ ...n, children, expanded: true, loading: false, error: null }))
+      )
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
   return (
     <aside className="sidebar">
       {/* 工作区区（侧边栏顶部） */}
@@ -195,6 +281,12 @@ export default function Sidebar({
           type="button"
           className={`sidebar__tree-toggle${listOpen ? ' sidebar__tree-toggle--open' : ''}`}
           onClick={toggleList}
+          onContextMenu={(e) =>
+            openMenu(e, [
+              { label: '新建 MD 文件', onClick: () => startCreate('', 'file') },
+              { label: '新建文件夹', onClick: () => startCreate('', 'folder') }
+            ])
+          }
           aria-expanded={listOpen}
           disabled={workspace.state !== 'active'} // 无工作区时禁用（评审 S3）
           title={
@@ -205,7 +297,7 @@ export default function Sidebar({
                 : '展开文件列表'
           }
         >
-          {/* 极简文件夹图标：收起=闭合、展开=打开 */}
+          {/* 极简文件夹图标：收起=闭合、展开=打开；右键=新建菜单（4.2） */}
           <FolderIcon open={listOpen} />
         </button>
 
@@ -217,11 +309,51 @@ export default function Sidebar({
               <p className="filetree__status">工作区为空</p>
             )}
             {!listError && !listLoading && tree && tree.length > 0 && (
-              <FileTree nodes={tree} editor={editor} onToggle={toggleFolder} />
+              <>
+                {/* 根级新建输入行（右键顶部文件夹图标触发） */}
+                {creating?.parentRelPath === '' && (
+                  <div className="filetree__create-row filetree__create-row--root">
+                    <InlineInput
+                      defaultValue={creating.type === 'folder' ? '新建文件夹' : '未命名.md'}
+                      onSubmit={submitCreate}
+                      onCancel={cancelCreate}
+                    />
+                  </div>
+                )}
+                <FileTree
+                  nodes={tree}
+                  editor={editor}
+                  onToggle={toggleFolder}
+                  onContextMenu={(e, node) =>
+                    openMenu(
+                      e,
+                      node.isDir
+                        ? [
+                            { label: '新建 MD 文件', onClick: () => startCreate(node.relPath, 'file') },
+                            { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') }
+                          ]
+                        : [] // 4.2 文件节点暂无操作（重命名/删除随 4.3/4.4）
+                    )
+                  }
+                  creating={creating}
+                  onSubmitCreate={submitCreate}
+                  onCancelCreate={cancelCreate}
+                />
+              </>
             )}
           </div>
         )}
       </div>
+
+      {/* 右键菜单（阶段 4 CRUD 唯一入口） */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </aside>
   )
 }

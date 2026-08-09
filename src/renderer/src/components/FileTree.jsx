@@ -1,6 +1,9 @@
-// 目录树最小形态（阶段 3.1 增强：支持嵌套子文件夹，点击整行展开/关闭）
+// 目录树（阶段 3.1 最小形态 + 阶段 4 演进：右键菜单入口 + 内联新建输入）
 // 文件夹节点：点击整行展开/关闭子内容（懒加载，展开时才读子级）；
 // 文件节点：点击打开到编辑器。图标为 Lucide 风格线性描边（PRD §3.4.4）。
+// 4.2 新建：右键菜单触发 creating 状态，目标位置渲染 InlineInput（内联输入名称，用户定案）。
+
+import { useEffect, useRef, useState } from 'react'
 
 export function FolderIcon({ open = false }) {
   return (
@@ -48,13 +51,52 @@ export function FileIcon() {
   )
 }
 
+// 内联输入行：新建（4.2）/ 重命名（4.3）共用。回车提交、Esc 取消、失焦提交（空值取消）。
+export function InlineInput({ defaultValue, onSubmit, onCancel }) {
+  const [value, setValue] = useState(defaultValue)
+  const inputRef = useRef(null)
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+  const commit = () => {
+    const v = value.trim()
+    if (v) onSubmit(v)
+    else onCancel()
+  }
+  return (
+    <input
+      ref={inputRef}
+      className="filetree__input"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit()
+        else if (e.key === 'Escape') onCancel()
+      }}
+      onBlur={commit}
+    />
+  )
+}
+
 /**
  * 递归渲染目录树。
  * @param {Array<object>} nodes 节点数组（{ name, relPath, isDir, expanded, loading, error, children }）
  * @param {object} editor editorStore（用于文件高亮与打开）
  * @param {(node: object) => void} onToggle 文件夹展开/关闭回调
+ * @param {(e: MouseEvent, node: object) => void} [onContextMenu] 节点右键菜单回调
+ * @param {{parentRelPath: string, type: 'file'|'folder'}|null} creating 新建中的目标位置（在该节点下渲染输入行）
  */
-export default function FileTree({ nodes, editor, onToggle, depth = 0 }) {
+export default function FileTree({
+  nodes,
+  editor,
+  onToggle,
+  depth = 0,
+  onContextMenu,
+  creating,
+  onSubmitCreate,
+  onCancelCreate
+}) {
   return (
     <ul className="filetree" role="tree">
       {nodes.map((node) => (
@@ -70,6 +112,11 @@ export default function FileTree({ nodes, editor, onToggle, depth = 0 }) {
                 className={`filetree__row${node.expanded ? ' filetree__row--open' : ''}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
                 onClick={() => onToggle(node)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onContextMenu?.(e, node)
+                }}
                 title={node.relPath}
               >
                 <span className="filetree__arrow" aria-hidden="true">
@@ -85,12 +132,27 @@ export default function FileTree({ nodes, editor, onToggle, depth = 0 }) {
                   <p className="filetree__status filetree__status--error">{node.error}</p>
                 ) : (
                   node.children && (
-                    <FileTree
-                      nodes={node.children}
-                      editor={editor}
-                      onToggle={onToggle}
-                      depth={depth + 1}
-                    />
+                    <>
+                      <FileTree
+                        nodes={node.children}
+                        editor={editor}
+                        onToggle={onToggle}
+                        depth={depth + 1}
+                        onContextMenu={onContextMenu}
+                        creating={creating}
+                        onSubmitCreate={onSubmitCreate}
+                        onCancelCreate={onCancelCreate}
+                      />
+                      {creating?.parentRelPath === node.relPath && (
+                        <li className="filetree__create-row">
+                          <InlineInput
+                            defaultValue={creating.type === 'folder' ? '新建文件夹' : '未命名.md'}
+                            onSubmit={onSubmitCreate}
+                            onCancel={onCancelCreate}
+                          />
+                        </li>
+                      )}
+                    </>
                   )
                 ))}
             </>
@@ -100,6 +162,15 @@ export default function FileTree({ nodes, editor, onToggle, depth = 0 }) {
               className={`filetree__row${editor.currentFile === node.relPath ? ' filetree__row--active' : ''}`}
               style={{ paddingLeft: 8 + depth * 14 }}
               onClick={() => editor.openFile(node.relPath)}
+              onContextMenu={
+                onContextMenu
+                  ? (e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onContextMenu(e, node)
+                    }
+                  : undefined
+              }
               title={node.relPath}
             >
               <span className="filetree__arrow filetree__arrow--spacer" aria-hidden="true">
