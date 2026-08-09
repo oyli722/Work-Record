@@ -1,5 +1,5 @@
 // 通用确认弹窗（4.4 删除二次确认，用户定案：渲染层自绘、主题统一）
-// 遮罩 + 居中卡片；确认 / 取消按钮；点击遮罩或 Esc 取消。
+// 遮罩 + 居中卡片；确认 / 取消按钮；7.2 起支持第三按钮（altLabel，如「放弃」），点击遮罩或 Esc 取消。
 import { useEffect } from 'react'
 
 export default function ConfirmDialog({
@@ -7,7 +7,11 @@ export default function ConfirmDialog({
   message,
   warning,
   confirmLabel = '删除',
+  confirmDanger = true,
+  altLabel,
+  altDanger = false,
   onConfirm,
+  onAlt,
   onCancel
 }) {
   useEffect(() => {
@@ -33,9 +37,18 @@ export default function ConfirmDialog({
           <button type="button" className="confirm-dialog__btn" onClick={onCancel}>
             取消
           </button>
+          {altLabel && (
+            <button
+              type="button"
+              className={`confirm-dialog__btn${altDanger ? ' confirm-dialog__btn--danger' : ''}`}
+              onClick={onAlt}
+            >
+              {altLabel}
+            </button>
+          )}
           <button
             type="button"
-            className="confirm-dialog__btn confirm-dialog__btn--danger"
+            className={`confirm-dialog__btn${confirmDanger ? ' confirm-dialog__btn--danger' : ''}`}
             onClick={onConfirm}
           >
             {confirmLabel}

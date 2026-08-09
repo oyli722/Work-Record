@@ -8,6 +8,7 @@ import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
 import ConfirmDialog from './ConfirmDialog'
 import DiffView from './DiffView'
+import TabBar, { fileNameOf } from './TabBar'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
@@ -34,6 +35,21 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
     const r = await save()
     if (r?.externalChange) setExternalConfirm(true)
   }, [save])
+
+  // 7.2 关闭未保存标签：三选 保存/放弃/取消（7.3 细化外部改动检测）
+  const [closeRequest, setCloseRequest] = useState(null)
+  async function handleCloseSave() {
+    const relPath = closeRequest
+    setCloseRequest(null)
+    editor.activateTab(relPath)
+    const r = await save()
+    if (r.ok) editor.confirmCloseTab(relPath) // externalChange：保存被阻止，不关闭
+  }
+  function handleCloseDiscard() {
+    const relPath = closeRequest
+    setCloseRequest(null)
+    editor.confirmCloseTab(relPath)
+  }
 
   // 3.7 分屏同步滚动（PRD §4.2.6）双向联动编排。
   // 子组件经 forwardRef 暴露 scrollToLine；drivingRef 记录当前驱动方向，回波忽略；
@@ -129,6 +145,8 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
         />
       ) : currentFile ? (
         <>
+          {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
+          <TabBar editor={editor} onCloseRequest={setCloseRequest} />
           <div className="editor__bar">
             <span className="editor__file" title={currentFile}>
               {currentFile}
@@ -227,6 +245,22 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
         </div>
       )}
       {error && <p className="editor__error">{error}</p>}
+
+      {/* 7.2 关闭未保存标签三选（7.3 细化外部改动检测） */}
+      {closeRequest && (
+        <ConfirmDialog
+          title="关闭标签"
+          message={`「${fileNameOf(closeRequest)}」有未保存的修改。`}
+          warning="保存将保留修改并关闭标签；放弃将丢弃未保存内容。"
+          confirmLabel="保存"
+          confirmDanger={false}
+          altLabel="放弃"
+          altDanger
+          onConfirm={handleCloseSave}
+          onAlt={handleCloseDiscard}
+          onCancel={() => setCloseRequest(null)}
+        />
+      )}
 
       {/* 4.5 外部改动覆盖确认（PRD §4.3.6） */}
       {externalConfirm && (

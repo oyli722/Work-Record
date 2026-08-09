@@ -101,10 +101,12 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
   /** 打开文件：已打开则激活；未打开则新开标签并加载（§4.7.1） */
   const openFile = useCallback(async (relPath) => {
     if (tabsRef.current.some((t) => t.relPath === relPath)) {
+      activeRef.current = relPath
       setActiveRelPath(relPath)
       return { ok: true }
     }
     setTabs((ts) => [...ts, { ...createTab(relPath, ''), loading: true }])
+    activeRef.current = relPath
     setActiveRelPath(relPath)
     try {
       const text = await window.mework.fs.readFile(relPath)
@@ -123,9 +125,12 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     }
   }, [])
 
-  /** 激活标签 */
+  /** 激活标签（同步 activeRef，供同一事件循环内 save 等读取） */
   const activateTab = useCallback((relPath) => {
-    if (tabsRef.current.some((t) => t.relPath === relPath)) setActiveRelPath(relPath)
+    if (tabsRef.current.some((t) => t.relPath === relPath)) {
+      activeRef.current = relPath
+      setActiveRelPath(relPath)
+    }
   }, [])
 
   /** 关闭前检查：未保存则需确认（7.3 三选弹窗） */
@@ -143,6 +148,7 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
         const next = ts.filter((t) => t.relPath !== relPath)
         if (activeRef.current === relPath) {
           const fallback = next[Math.min(idx, next.length - 1)]
+          activeRef.current = fallback?.relPath ?? null
           setActiveRelPath(fallback?.relPath ?? null)
         }
         return next
@@ -208,7 +214,10 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
   /** 重命名后同步标签路径（4.3） */
   const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
     setTabs((ts) => ts.map((t) => (t.relPath === oldRelPath ? { ...t, relPath: newRelPath } : t)))
-    if (activeRef.current === oldRelPath) setActiveRelPath(newRelPath)
+    if (activeRef.current === oldRelPath) {
+      activeRef.current = newRelPath
+      setActiveRelPath(newRelPath)
+    }
   }, [])
 
   /** 删除后若打开标签受影响则关闭（4.4） */
@@ -218,8 +227,13 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
         (t) => !(t.relPath === deletedRelPath || t.relPath.startsWith(`${deletedRelPath}/`))
       )
       if (next.length !== ts.length) {
-        if (next.length === 0) setActiveRelPath(null)
-        else if (!next.some((t) => t.relPath === activeRef.current)) setActiveRelPath(next[0].relPath)
+        if (next.length === 0) {
+          activeRef.current = null
+          setActiveRelPath(null)
+        } else if (!next.some((t) => t.relPath === activeRef.current)) {
+          activeRef.current = next[0].relPath
+          setActiveRelPath(next[0].relPath)
+        }
         return next
       }
       return ts
@@ -231,6 +245,7 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     autosaveTimersRef.current.forEach((timer) => clearTimeout(timer))
     autosaveTimersRef.current.clear()
     setTabs([])
+    activeRef.current = null
     setActiveRelPath(null)
   }, [])
 
