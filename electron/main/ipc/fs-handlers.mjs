@@ -25,6 +25,9 @@ export function registerFsHandlers() {
     getActiveFs().renameWithVersions(relFrom, relTo)
   ) // 4.3：重命名 + 版本库迁移
   ipcMain.handle('fs:delete', (_e, relPath) => getActiveFs().delete(relPath))
+  ipcMain.handle('fs:delete_with_versions', (_e, relPath) =>
+    getActiveFs().deleteWithVersions(relPath)
+  ) // 4.4：删除 + 版本库清空
   ipcMain.handle('fs:stat', (_e, relPath) => getActiveFs().stat(relPath))
 
   // 目录选择：供工作区引导 / 更换使用。返回绝对路径（不作为读写路径，仅授权意图）。

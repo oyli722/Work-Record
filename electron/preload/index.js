@@ -23,6 +23,8 @@ const api = {
     renameWithVersions: (relFrom, relTo) =>
       ipcRenderer.invoke('fs:rename_with_versions', relFrom, relTo),
     delete: (relPath) => ipcRenderer.invoke('fs:delete', relPath),
+    /** 删除并清空版本库（阶段 4.4：.wr/versions 对应目录一并删除） */
+    deleteWithVersions: (relPath) => ipcRenderer.invoke('fs:delete_with_versions', relPath),
     stat: (relPath) => ipcRenderer.invoke('fs:stat', relPath),
     /** 打开系统目录选择对话框，返回选中目录绝对路径或 null（工作区引导用） */
     chooseDirectory: () => ipcRenderer.invoke('fs:choose_directory')

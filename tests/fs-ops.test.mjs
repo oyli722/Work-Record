@@ -96,6 +96,29 @@ test('renameWithVersions 版本库不存在时跳过（阶段 4 预留调用）'
   assert.equal(await ops.readFile('plain-renamed.md'), 'y')
 })
 
+test('deleteWithVersions 删除文件并清空版本库（4.4）', async () => {
+  await ops.writeFile('del-note.md', 'd')
+  await ops.writeFile('.wr/versions/del-note.md/V1.md', 'v1') // 模拟阶段 5 版本库
+  await ops.deleteWithVersions('del-note.md')
+  await assert.rejects(() => ops.readFile('del-note.md'), /ENOENT/)
+  await assert.rejects(() => ops.readFile('.wr/versions/del-note.md/V1.md'), /ENOENT/)
+})
+
+test('deleteWithVersions 版本库不存在时跳过（阶段 4 预留）', async () => {
+  await ops.writeFile('del-plain.md', 'p')
+  await ops.deleteWithVersions('del-plain.md') // 不应抛错
+  await assert.rejects(() => ops.readFile('del-plain.md'), /ENOENT/)
+})
+
+test('deleteWithVersions 删除文件夹并递归清空其下版本库', async () => {
+  await ops.mkdir('del-dir')
+  await ops.writeFile('del-dir/note.md', 'n')
+  await ops.writeFile('.wr/versions/del-dir/note.md/V1.md', 'v1')
+  await ops.deleteWithVersions('del-dir')
+  await assert.rejects(() => ops.stat('del-dir'), /ENOENT/)
+  await assert.rejects(() => ops.readFile('.wr/versions/del-dir/note.md/V1.md'), /ENOENT/)
+})
+
 test('delete 删除文件与递归目录', async () => {
   await ops.writeFile('del-file.txt', 'd')
   await ops.delete('del-file.txt')

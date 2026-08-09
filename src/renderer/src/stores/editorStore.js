@@ -145,6 +145,15 @@ export default function useEditor({
     }
   }, [])
 
+  /** 删除后若当前打开文件受影响则关闭（4.4）：被删文件本身或其所在文件夹被删 */
+  const closeIfPathDeleted = useCallback(
+    (deletedRelPath) => {
+      const cur = currentFileRef.current
+      if (cur && (cur === deletedRelPath || cur.startsWith(`${deletedRelPath}/`))) close()
+    },
+    [close]
+  )
+
   // 卸载时清理自动保存定时器（未触发的保存不泄漏）
   useEffect(() => clearAutosave, [clearAutosave])
 
@@ -159,6 +168,7 @@ export default function useEditor({
     setContent,
     save,
     close,
-    renameCurrentFile
+    renameCurrentFile,
+    closeIfPathDeleted
   }
 }

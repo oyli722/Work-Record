@@ -102,6 +102,19 @@ export function createFsOps(guard) {
       await rm(abs, { recursive: info.isDirectory(), force: false })
     },
 
+    /** 删除并清空版本库（4.4，PRD §4.3.5）。
+        删除文件/文件夹后，`.wr/versions/<relPath>` 一并清空（文件夹即递归清空其下所有版本库）。
+        版本库由阶段 5 填充；当前不存在则跳过（阶段 4 预留调用）。 */
+    async deleteWithVersions(relPath) {
+      await this.delete(relPath)
+      const versions = await safe(`${WR_DIR_NAME}/versions/${relPath}`)
+      try {
+        await rm(versions, { recursive: true, force: false })
+      } catch {
+        /* 版本库尚不存在（阶段 5 填充后才生成）：跳过 */
+      }
+    },
+
     /** 查询路径状态（存在性 / 类型），供 UI 判断。 */
     async stat(relPath) {
       const abs = await safe(relPath)

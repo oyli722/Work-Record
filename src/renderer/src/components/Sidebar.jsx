@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
+import ConfirmDialog from './ConfirmDialog'
 
 const DOC_EXT = /\.(md|txt)$/i
 
@@ -34,6 +35,7 @@ export default function Sidebar({
   const [contextMenu, setContextMenu] = useState(null) // { x, y, items }
   const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
   const [renaming, setRenaming] = useState(null) // 重命名中的节点（4.3）
+  const [deleteTarget, setDeleteTarget] = useState(null) // 待删除二次确认的节点（4.4）
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -233,6 +235,30 @@ export default function Sidebar({
     setRenaming(null)
   }
 
+  /** 开始删除（4.4）：弹出二次确认 */
+  function startDelete(node) {
+    setContextMenu(null)
+    setDeleteTarget(node)
+  }
+
+  /** 确认删除：文件/文件夹 + 版本库清空（PRD §4.3.5）；打开中文件被删则关闭 */
+  async function confirmDelete() {
+    const node = deleteTarget
+    setDeleteTarget(null)
+    const parentRelPath = dirOf(node.relPath)
+    try {
+      await window.mework.fs.deleteWithVersions(node.relPath)
+      editor.closeIfPathDeleted(node.relPath)
+      await refreshParent(parentRelPath)
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  function cancelDelete() {
+    setDeleteTarget(null)
+  }
+
   /** 刷新目标目录的子树（新建/后续 CRUD 后调用） */
   async function refreshParent(parentRelPath) {
     if (parentRelPath === '') {
@@ -365,9 +391,13 @@ export default function Sidebar({
                         ? [
                             { label: '新建 MD 文件', onClick: () => startCreate(node.relPath, 'file') },
                             { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') },
-                            { label: '重命名', onClick: () => startRename(node) }
+                            { label: '重命名', onClick: () => startRename(node) },
+                            { label: '删除', danger: true, onClick: () => startDelete(node) }
                           ]
-                        : [{ label: '重命名', onClick: () => startRename(node) }]
+                        : [
+                            { label: '重命名', onClick: () => startRename(node) },
+                            { label: '删除', danger: true, onClick: () => startDelete(node) }
+                          ]
                     )
                   }
                   creating={creating}
@@ -390,6 +420,22 @@ export default function Sidebar({
           y={contextMenu.y}
           items={contextMenu.items}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* 删除二次确认（4.4，PRD §4.3.5） */}
+      {deleteTarget && (
+        <ConfirmDialog
+          title={deleteTarget.isDir ? '删除文件夹' : '删除文件'}
+          message={`确定删除「${deleteTarget.name}」？此操作不可恢复。`}
+          warning={
+            deleteTarget.isDir
+              ? '该文件夹将递归删除其中所有内容，版本历史将一并清空。'
+              : '该文件的版本历史将一并清空。'
+          }
+          confirmLabel="删除"
+          onConfirm={confirmDelete}
+          onCancel={cancelDelete}
         />
       )}
     </aside>
