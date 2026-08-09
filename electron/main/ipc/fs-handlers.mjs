@@ -18,6 +18,7 @@ export function registerFsHandlers() {
     getActiveFs().writeFile(relPath, content)
   )
   ipcMain.handle('fs:list_directory', (_e, relPath) => getActiveFs().listDirectory(relPath))
+  ipcMain.handle('fs:list_detail', (_e, relPath) => getActiveFs().listDetail(relPath)) // 4.1：目录树聚合
   ipcMain.handle('fs:mkdir', (_e, relPath) => getActiveFs().mkdir(relPath))
   ipcMain.handle('fs:rename', (_e, relFrom, relTo) => getActiveFs().rename(relFrom, relTo))
   ipcMain.handle('fs:delete', (_e, relPath) => getActiveFs().delete(relPath))

@@ -59,22 +59,16 @@ export default function Sidebar({
     return res
   }
 
-  /** 将目录项构造成树节点：文件夹全保留、文件只留 MD/TXT；目录在前、文件在后，各按名称排序 */
-  async function buildNodes(entries, parentPath) {
+  /** 将目录项构造成树节点：文件夹全保留、文件只留 MD/TXT；目录在前、文件在后，各按名称排序。
+      items 来自 fs:list_detail（[{ name, isDirectory }]，4.1），已含类型，无需再逐项 stat。 */
+  function buildNodes(items, parentPath) {
     const nodes = []
-    for (const name of entries) {
-      const relPath = parentPath ? `${parentPath}/${name}` : name
-      let info
-      try {
-        info = await window.mework.fs.stat(relPath)
-      } catch {
-        continue // 无法 stat（并发删除等）跳过
-      }
-      if (!info.isDirectory && !DOC_EXT.test(name)) continue
+    for (const item of items) {
+      if (!item.isDirectory && !DOC_EXT.test(item.name)) continue
       nodes.push({
-        name,
-        relPath,
-        isDir: info.isDirectory,
+        name: item.name,
+        relPath: parentPath ? `${parentPath}/${item.name}` : item.name,
+        isDir: item.isDirectory,
         expanded: false,
         loading: false,
         error: null,
@@ -87,13 +81,22 @@ export default function Sidebar({
     })
   }
 
+  /** 不可变更新目录树中指定节点（4.1，评审 S2：不再直接 mutate 节点对象） */
+  function updateNode(nodes, relPath, updater) {
+    return nodes.map((n) => {
+      if (n.relPath === relPath) return updater(n)
+      if (n.children) return { ...n, children: updateNode(n.children, relPath, updater) }
+      return n
+    })
+  }
+
   /** 加载根层节点（首次展开时） */
   async function loadRoot() {
     setListLoading(true)
     setListError(null)
     try {
-      const entries = await window.mework.fs.listDirectory('.')
-      setTree(await buildNodes(entries, ''))
+      const items = await window.mework.fs.listDetail('.')
+      setTree(buildNodes(items, ''))
     } catch (err) {
       setListError(String(err?.message ?? err))
     } finally {
@@ -101,25 +104,24 @@ export default function Sidebar({
     }
   }
 
-  /** 展开/关闭文件夹节点（懒加载子级；关闭时释放子数据保持新鲜） */
+  /** 展开/关闭文件夹节点（懒加载子级；关闭时释放子数据保持新鲜；不可变更新） */
   async function toggleFolder(node) {
     if (node.expanded) {
-      node.expanded = false
-      node.children = null
-    } else {
-      node.expanded = true
-      node.loading = true
-      setTree([...tree]) // 先渲染加载态
-      try {
-        const entries = await window.mework.fs.listDirectory(node.relPath)
-        node.children = await buildNodes(entries, node.relPath)
-      } catch (err) {
-        node.error = String(err?.message ?? err)
-      } finally {
-        node.loading = false
-      }
+      setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null })))
+      return
     }
-    setTree([...tree])
+    setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, loading: true })))
+    try {
+      const items = await window.mework.fs.listDetail(node.relPath)
+      const children = buildNodes(items, node.relPath)
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, expanded: true, loading: false, children, error: null }))
+      )
+    } catch (err) {
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+      )
+    }
   }
 
   function toggleList() {

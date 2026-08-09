@@ -54,6 +54,16 @@ test('listDirectory 排除 .wr 衍生目录', async () => {
   assert.ok(items.includes('a.txt')) // 正常项仍可见
 })
 
+test('listDetail 一次返回条目与类型（4.1 目录树聚合）', async () => {
+  const items = await ops.listDetail('.')
+  const names = items.map((i) => i.name)
+  assert.ok(names.includes('a.txt'))
+  assert.ok(names.includes('sub'))
+  assert.ok(!names.includes('.wr')) // 聚合同样排除衍生目录
+  assert.equal(items.find((i) => i.name === 'a.txt').isDirectory, false)
+  assert.equal(items.find((i) => i.name === 'sub').isDirectory, true)
+})
+
 test('mkdir 创建嵌套目录', async () => {
   await ops.mkdir('x/y/z')
   const stat = await ops.stat('x/y/z')

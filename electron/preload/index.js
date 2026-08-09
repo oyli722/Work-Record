@@ -15,6 +15,8 @@ const api = {
     readFile: (relPath) => ipcRenderer.invoke('fs:read_file', relPath),
     writeFile: (relPath, content) => ipcRenderer.invoke('fs:write_file', relPath, content),
     listDirectory: (relPath) => ipcRenderer.invoke('fs:list_directory', relPath),
+    /** 目录树聚合：一次返回目录项 + 类型（[{ name, isDirectory }]，阶段 4.1） */
+    listDetail: (relPath) => ipcRenderer.invoke('fs:list_detail', relPath),
     mkdir: (relPath) => ipcRenderer.invoke('fs:mkdir', relPath),
     rename: (relFrom, relTo) => ipcRenderer.invoke('fs:rename', relFrom, relTo),
     delete: (relPath) => ipcRenderer.invoke('fs:delete', relPath),

@@ -1,5 +1,5 @@
 import { readFile, writeFile, readdir, mkdir, rename, rm, stat } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { WR_DIR_NAME } from './constants.mjs'
 
 /**
@@ -45,6 +45,25 @@ export function createFsOps(guard) {
       const abs = await safe(relPath)
       const entries = await readdir(abs)
       return entries.filter((name) => name !== WR_DIR_NAME)
+    },
+
+    /** 列出目录项并带类型（[{ name, isDirectory }]，4.1）。
+        一次 IPC 返回条目与 stat，避免目录树逐项 stat 造成 IPC 洪泛（评审 S1）。
+        与 listDirectory 同源过滤 `.wr/`；单项 stat 失败（并发删除等）跳过不抛。 */
+    async listDetail(relPath) {
+      const abs = await safe(relPath)
+      const entries = await readdir(abs)
+      const items = []
+      for (const name of entries) {
+        if (name === WR_DIR_NAME) continue
+        try {
+          const info = await stat(join(abs, name))
+          items.push({ name, isDirectory: info.isDirectory() })
+        } catch {
+          /* 单项 stat 失败：跳过（并发删除 / 权限边界），不中断整列 */
+        }
+      }
+      return items
     },
 
     /** 创建目录（递归）。 */
