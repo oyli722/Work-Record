@@ -1,8 +1,9 @@
-// 主区编辑器（阶段 3.2：三态布局 + CodeMirror 编辑区）
+// 主区编辑器（阶段 3.2/3.7：三态布局 + CodeMirror 编辑区 + 分屏同步滚动）
 // 工具栏：文件名 + 三态切换（分屏/仅编辑/仅预览）+ 保存状态 + 保存按钮。
 // 内容区：split 分屏（CodeMirror 编辑 | 预览占位），拖拽分隔条调比例（PRD §4.2.1）。
 // 自动保存 / Ctrl+S 体系随 3.3；预览 markdown 渲染随 3.4。
-import { useEffect, useRef, useState } from 'react'
+// 3.7 分屏同步滚动（PRD §4.2.6）：split 模式下编辑/预览滚动双向联动（见下方编排）。
+import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
 
@@ -24,6 +25,40 @@ export default function EditorPane({ editor, theme }) {
   const [ratio, setRatio] = useState(50) // 分屏比例（编辑区宽度 %）
   const bodyRef = useRef(null)
   const dragRef = useRef(null) // { startX, startRatio }
+
+  // 3.7 分屏同步滚动（PRD §4.2.6）双向联动编排。
+  // 子组件经 forwardRef 暴露 scrollToLine；drivingRef 记录当前驱动方向，回波忽略；
+  // 驱动后延时清除以恢复用户滚动；子组件内部另有 programmatic 抑制，双保险防回环。
+  const editorScrollRef = useRef(null)
+  const previewScrollRef = useRef(null)
+  const drivingRef = useRef(null) // 'editor' | 'preview' | null
+  const driveTimerRef = useRef(0)
+
+  // 编辑区滚动 → 驱动预览区。守卫语义（评审 S1）：对方（预览）驱动中，
+  // 编辑区的 programmatic 回波应忽略；自己驱动期间置 drivingRef 并在延时后清除。
+  const handleEditorTopLine = useCallback((line) => {
+    if (drivingRef.current === 'preview') return
+    drivingRef.current = 'editor'
+    clearTimeout(driveTimerRef.current)
+    driveTimerRef.current = setTimeout(() => {
+      drivingRef.current = null
+    }, 80)
+    previewScrollRef.current?.scrollToLine(line)
+  }, [])
+
+  // 预览区滚动 → 驱动编辑区。守卫语义对称：编辑驱动中忽略预览区回波。
+  const handlePreviewTopLine = useCallback((line) => {
+    if (drivingRef.current === 'editor') return
+    drivingRef.current = 'preview'
+    clearTimeout(driveTimerRef.current)
+    driveTimerRef.current = setTimeout(() => {
+      drivingRef.current = null
+    }, 80)
+    editorScrollRef.current?.scrollToLine(line)
+  }, [])
+
+  // 卸载清理联动定时器
+  useEffect(() => () => clearTimeout(driveTimerRef.current), [])
 
   // Ctrl+S 手动保存（PRD §4.2.3；无文件时不注册，避免误触发「尚未打开文件」错误）
   useEffect(() => {
@@ -109,7 +144,13 @@ export default function EditorPane({ editor, theme }) {
                 className="editor__pane editor__pane--edit"
                 style={mode === 'edit' ? { flex: '1 1 100%' } : { flex: `0 0 ${ratio}%` }}
               >
-                <CodeMirrorEditor value={content} onChange={setContent} theme={theme} />
+                <CodeMirrorEditor
+                  ref={editorScrollRef}
+                  value={content}
+                  onChange={setContent}
+                  theme={theme}
+                  onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
+                />
               </div>
             )}
             {mode === 'split' && (
@@ -122,7 +163,13 @@ export default function EditorPane({ editor, theme }) {
                   title="拖拽调整分屏比例"
                 />
                 <div className="editor__pane editor__pane--preview">
-                  <PreviewPane content={content} isMarkdown={isMarkdown} baseDir={baseDir} />
+                  <PreviewPane
+                    ref={previewScrollRef}
+                    content={content}
+                    isMarkdown={isMarkdown}
+                    baseDir={baseDir}
+                    onTopLineChange={handlePreviewTopLine}
+                  />
                 </div>
               </>
             )}

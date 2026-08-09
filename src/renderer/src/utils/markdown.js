@@ -31,6 +31,35 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
     : self.renderToken(tokens, idx, options)
 }
 
+// 3.7 分屏同步滚动锚点：给块级元素注入 data-src-line（源码起始行，1-based），
+// 供预览区按顶部可见行联动定位（PRD §4.2.6）。token.map 为 markdown-it 0-based 源行。
+// DOMPurify 默认允许 data-* 属性，sanitize 后锚点保留。分两类 token：
+//   - open/close 对：规则键为 `${type}_open`
+//   - 自闭合块级：规则键即类型本身（fence / code_block / hr）
+const PAIRED_BLOCK_OPEN = ['paragraph', 'heading', 'list_item', 'blockquote', 'table', 'tr', 'th', 'td']
+for (const type of PAIRED_BLOCK_OPEN) {
+  const key = `${type}_open`
+  // 此类 open 规则 markdown-it 多数无默认实现（走 renderToken 通用属性渲染），
+  // 有默认规则则透传，无则回退 renderToken（会输出 token.attrs → data-src-line）。
+  const defaultRule = md.renderer.rules[key]
+  md.renderer.rules[key] = (tokens, idx, options, env, self) => {
+    const t = tokens[idx]
+    if (t.map) t.attrSet('data-src-line', String(t.map[0] + 1))
+    return defaultRule
+      ? defaultRule(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options)
+  }
+}
+for (const type of ['fence', 'code_block', 'hr']) {
+  const defaultRule = md.renderer.rules[type]
+  if (!defaultRule) continue
+  md.renderer.rules[type] = (tokens, idx, options, env, self) => {
+    const t = tokens[idx]
+    if (t.map) t.attrSet('data-src-line', String(t.map[0] + 1))
+    return defaultRule(tokens, idx, options, env, self)
+  }
+}
+
 // DOMPurify URI 白名单：官方语义 + 追加 mework-file（3.5 本地图，否则 src 会被清理）。
 // 第三分支保留官方「冒号排除」语义（[^a-z+.-:]），阻止 javascript:/vbscript:/file: 等
 // 危险协议经链接/图片语法注入（评审 P1：先前改写第三分支致 XSS 漏洞）。

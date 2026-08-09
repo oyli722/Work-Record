@@ -1,15 +1,103 @@
-// 预览区（阶段 3.4/3.5/3.6：markdown-it + DOMPurify 渲染，暖纸阅读面）
+// 预览区（阶段 3.4/3.5/3.6/3.7：markdown-it + DOMPurify 渲染，暖纸阅读面）
 // isMarkdown=false（TXT）退化为纯文本 pre 呈现。
 // 相对图片经 baseDir 解析为 mework-file://（3.5）；外链点击 → 系统浏览器/默认程序（3.6）。
 // 协议白名单单一来源 src/shared/link-policy.js（评审 S3），主进程同引用。
-import { useMemo, useCallback } from 'react'
+// 3.7 分屏同步滚动（PRD §4.2.6）：经 forwardRef 暴露 scrollToLine，滚动上报顶部可见行
+// onTopLineChange；MD 按 data-src-line 锚点对齐，TXT 按百分比对齐；programmatic 抑制防回环。
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import { renderMarkdown } from '../utils/markdown'
 import { isExternalLink } from '../../../shared/link-policy'
 
-export default function PreviewPane({ content, isMarkdown, baseDir }) {
+const PreviewPane = forwardRef(function PreviewPane(
+  { content, isMarkdown, baseDir, onTopLineChange },
+  ref
+) {
   const html = useMemo(
     () => (isMarkdown ? renderMarkdown(content, baseDir) : ''),
     [content, isMarkdown, baseDir]
+  )
+  const scrollRef = useRef(null)
+  const onTopLineChangeRef = useRef(onTopLineChange)
+  onTopLineChangeRef.current = onTopLineChange
+  const anchorsRef = useRef([]) // MD 锚点缓存 [{srcLine, top, bottom}]，文档序、行号递增
+  const progRef = useRef(false) // programmatic 滚动抑制（防双向联动回环）
+  const progTimerRef = useRef(0)
+
+  // 锚点缓存刷新：渲染内容变化后重建。缓存 top/bottom（相对容器文档顶，含已滚出部分），
+  // 滚动时直接与 scrollTop 比较，避免高频 getBoundingClientRect 强制 reflow（评审 S2）。
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) {
+      anchorsRef.current = []
+      return
+    }
+    const cTop = el.getBoundingClientRect().top
+    const scrollTop = el.scrollTop
+    anchorsRef.current = Array.from(el.querySelectorAll('[data-src-line]')).map((a) => {
+      const r = a.getBoundingClientRect()
+      const top = r.top - cTop + scrollTop
+      return { srcLine: Number(a.dataset.srcLine), top, bottom: top + r.height }
+    })
+  }, [html, isMarkdown])
+
+  /** 计算当前顶部可见的源码行（MD 二分找首个底部越过视口顶的锚点；TXT 百分比换算） */
+  const computeTopLine = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return 0
+    if (isMarkdown) {
+      const scrollTop = el.scrollTop
+      const anchors = anchorsRef.current
+      let lo = 0
+      let hi = anchors.length
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1
+        if (anchors[mid].bottom > scrollTop) hi = mid
+        else lo = mid + 1
+      }
+      // 评审 P1：全部锚点滚出视口上方（文档尾部无锚点行）→ 回退最后锚点
+      const top = lo < anchors.length ? anchors[lo] : anchors[anchors.length - 1]
+      return top ? top.srcLine : 0
+    }
+    const maxScroll = el.scrollHeight - el.clientHeight
+    if (maxScroll <= 0) return 0
+    const totalLines = content.split('\n').length
+    return Math.max(1, Math.round((el.scrollTop / maxScroll) * totalLines))
+  }, [isMarkdown, content])
+
+  // 暴露给父级：滚动到指定源码行（MD 二分定位最近锚点；TXT 百分比）
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToLine(line) {
+        const el = scrollRef.current
+        if (!el || line < 1) return
+        progRef.current = true
+        clearTimeout(progTimerRef.current)
+        progTimerRef.current = setTimeout(() => {
+          progRef.current = false
+        }, 60) // 滚动停稳后恢复上报
+        if (isMarkdown) {
+          const anchors = anchorsRef.current
+          let lo = 0
+          let hi = anchors.length
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1
+            if (anchors[mid].srcLine >= line) hi = mid
+            else lo = mid + 1
+          }
+          // 评审 P1：末尾无更高锚点 → 回退最后一个锚点（对齐到文档尾部）
+          const target = lo < anchors.length ? anchors[lo] : anchors[anchors.length - 1]
+          if (!target) return
+          el.scrollTop = target.top // 目标锚点滚到容器顶部（即时、同步）
+        } else {
+          const maxScroll = el.scrollHeight - el.clientHeight
+          if (maxScroll <= 0) return
+          const totalLines = content.split('\n').length
+          el.scrollTop = Math.min(maxScroll, Math.max(0, ((line - 1) / totalLines) * maxScroll))
+        }
+      }
+    }),
+    [isMarkdown, content]
   )
 
   // 事件委托：命中 <a> 即阻止应用内导航（预览链接当前窗口打开是错误行为），
@@ -25,15 +113,21 @@ export default function PreviewPane({ content, isMarkdown, baseDir }) {
     }
   }, [])
 
+  // 滚动上报：programmatic 驱动期间抑制（防回环）；父级未接联动时安全跳过（?.）
+  const handleScroll = useCallback(() => {
+    if (progRef.current) return
+    onTopLineChangeRef.current?.(computeTopLine())
+  }, [computeTopLine])
+
   if (!isMarkdown) {
     return (
-      <div className="preview">
+      <div className="preview" ref={scrollRef} onScroll={handleScroll}>
         <pre className="preview__text">{content}</pre>
       </div>
     )
   }
   return (
-    <div className="preview">
+    <div className="preview" ref={scrollRef} onScroll={handleScroll}>
       <div
         className="preview__md"
         dangerouslySetInnerHTML={{ __html: html }}
@@ -41,4 +135,6 @@ export default function PreviewPane({ content, isMarkdown, baseDir }) {
       />
     </div>
   )
-}
+})
+
+export default PreviewPane
