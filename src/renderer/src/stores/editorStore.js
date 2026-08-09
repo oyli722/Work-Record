@@ -24,23 +24,41 @@ export default function useEditor({
   const [saveState, setSaveState] = useState('saved') // saved | saving | dirty
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [externalChange, setExternalChange] = useState(false) // 磁盘被外部修改，保存被阻止（4.5 评审 P1）
 
   // ref 镜像最新值：供回调在稳定闭包下读写（避免 useCallback 依赖链抖动）
   const currentFileRef = useRef(null)
   const contentRef = useRef('')
   const savedContentRef = useRef('')
+  const diskSnapshotRef = useRef('') // 磁盘内容快照（打开/保存时记录，4.5 外部改动检测基准）
   const autosaveTimerRef = useRef(null)
 
-  /** 实际落盘逻辑（自动 / 手动 / 切换前共用）。内容无变化不写盘。 */
-  const doSave = useCallback(async () => {
+  /** 实际落盘逻辑（自动 / 手动 / 切换前共用）。内容无变化不写盘。
+      force=true 时跳过外部改动检测（用户已在覆盖确认弹窗中拍板）。 */
+  const doSave = useCallback(async (force = false) => {
     const file = currentFileRef.current
     const text = contentRef.current
     if (!file) return { ok: false, error: '尚未打开文件' }
     if (text === savedContentRef.current) return { ok: true } // 无变化不写盘（PRD §4.5.2 同源）
+    // 4.5 外部改动检测：磁盘当前内容与快照不一致 → 保存将覆盖外部改动，需确认（PRD §4.3.6）
+    if (!force) {
+      try {
+        const disk = await window.mework.fs.readFile(file)
+        if (disk !== diskSnapshotRef.current) {
+          // 评审 P1：外部改动提升为 store 状态，自动/手动保存都被阻止时 UI 统一提示，不再静默丢弃
+          setExternalChange(true)
+          return { ok: false, externalChange: true }
+        }
+      } catch {
+        /* 读磁盘失败（文件被外部删除等）：继续保存（writeFile 会重建） */
+      }
+    }
     setSaveState('saving')
     try {
       await window.mework.fs.writeFile(file, text)
       savedContentRef.current = text
+      diskSnapshotRef.current = text
+      setExternalChange(false) // 覆盖确认（save(true)）或正常保存后清除（评审 P1/S3）
       // 保存期间若有新编辑，保持 dirty，避免「已保存」状态失真丢编辑（评审 P1）
       setSaveState(contentRef.current === text ? 'saved' : 'dirty')
       return { ok: true }
@@ -77,7 +95,8 @@ export default function useEditor({
       if (currentFileRef.current && contentRef.current !== savedContentRef.current) {
         const prev = await doSave()
         if (!prev.ok) {
-          setError(prev.error)
+          // 评审 P2：externalChange 不由 error 呈现（状态区已有提示），避免 setError(undefined) 清空现场
+          if (!prev.externalChange) setError(prev.error)
           return { ok: false, error: prev.error }
         }
       }
@@ -89,6 +108,7 @@ export default function useEditor({
         currentFileRef.current = relPath
         contentRef.current = text
         savedContentRef.current = text
+        diskSnapshotRef.current = text // 打开时磁盘快照（4.5 外部改动检测基准）
         setCurrentFile(relPath)
         setContentState(text)
         setSaveState('saved')
@@ -117,13 +137,17 @@ export default function useEditor({
     [scheduleAutosave, clearAutosave]
   )
 
-  /** 手动保存（按钮 / Ctrl+S）：取消待保存计时并立即落盘 */
-  const save = useCallback(async () => {
-    clearAutosave()
-    const r = await doSave()
-    if (!r.ok) setError(r.error)
-    return r
-  }, [doSave, clearAutosave])
+  /** 手动保存（按钮 / Ctrl+S）：取消待保存计时并立即落盘。
+      force=true 跳过外部改动检测（覆盖确认后调用，4.5）。 */
+  const save = useCallback(
+    async (force = false) => {
+      clearAutosave()
+      const r = await doSave(force)
+      if (!r.ok && !r.externalChange) setError(r.error) // externalChange 由 UI 弹确认，不显示错误
+      return r
+    },
+    [doSave, clearAutosave]
+  )
 
   /** 关闭当前文件（切换工作区后调用，清空编辑器状态） */
   const close = useCallback(() => {
@@ -131,6 +155,7 @@ export default function useEditor({
     currentFileRef.current = null
     contentRef.current = ''
     savedContentRef.current = ''
+    diskSnapshotRef.current = ''
     setCurrentFile(null)
     setContentState('')
     setSaveState('saved')
@@ -164,6 +189,7 @@ export default function useEditor({
     dirty: saveState === 'dirty',
     error,
     loading,
+    externalChange,
     openFile,
     setContent,
     save,

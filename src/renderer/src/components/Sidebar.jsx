@@ -36,6 +36,7 @@ export default function Sidebar({
   const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
   const [renaming, setRenaming] = useState(null) // 重命名中的节点（4.3）
   const [deleteTarget, setDeleteTarget] = useState(null) // 待删除二次确认的节点（4.4）
+  const [deleteEmpty, setDeleteEmpty] = useState(true) // 删除目标是否为空文件夹（评审 S1）
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -222,6 +223,17 @@ export default function Sidebar({
     if (!newName || newName === node.name) return
     const parentRelPath = dirOf(node.relPath)
     const newRelPath = parentRelPath ? `${parentRelPath}/${newName}` : newName
+    // 评审 P3：目标已存在则拒绝（POSIX/macOS 下 rename 会静默覆盖已存在文件，数据安全）
+    let targetExists = false
+    try {
+      targetExists = (await window.mework.fs.stat(newRelPath)).exists
+    } catch {
+      targetExists = false // 目标不存在（ENOENT），允许重命名
+    }
+    if (targetExists) {
+      setListError(`已存在同名目标「${newName}」，重命名已取消。`)
+      return
+    }
     try {
       await window.mework.fs.renameWithVersions(node.relPath, newRelPath)
       editor.renameCurrentFile(node.relPath, newRelPath) // 打开中的文件同步新路径，避免保存到旧路径
@@ -235,10 +247,20 @@ export default function Sidebar({
     setRenaming(null)
   }
 
-  /** 开始删除（4.4）：弹出二次确认 */
-  function startDelete(node) {
+  /** 开始删除（4.4）：弹出二次确认；区分空/非空文件夹警告（评审 S1） */
+  async function startDelete(node) {
     setContextMenu(null)
     setDeleteTarget(node)
+    if (node.isDir) {
+      try {
+        const items = await window.mework.fs.listDetail(node.relPath)
+        setDeleteEmpty(items.length === 0)
+      } catch {
+        setDeleteEmpty(false)
+      }
+    } else {
+      setDeleteEmpty(true) // 文件无递归警告
+    }
   }
 
   /** 确认删除：文件/文件夹 + 版本库清空（PRD §4.3.5）；打开中文件被删则关闭 */
@@ -270,6 +292,67 @@ export default function Sidebar({
       const children = buildNodes(items, parentRelPath)
       setTree((t) =>
         updateNode(t, parentRelPath, (n) => ({ ...n, children, expanded: true, loading: false, error: null }))
+      )
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  /** 递归刷新目录树（保留展开状态，感知外部改动；4.5，PRD §4.3.6）。
+      磁盘中已删除的节点移除、新增的项追加；已展开的文件夹递归刷新子级。 */
+  async function refreshTreeNodes(nodes, parentRelPath) {
+    const items = await window.mework.fs.listDetail(parentRelPath)
+    const diskByName = new Map(items.map((i) => [i.name, i]))
+    const existing = new Set(nodes.map((n) => n.name))
+    const next = []
+    for (const node of nodes) {
+      const disk = diskByName.get(node.name)
+      if (!disk) continue // 磁盘已删除该节点
+      if (node.isDir && node.expanded) {
+        const children = node.children ? await refreshTreeNodes(node.children, node.relPath) : null
+        next.push({ ...node, children, error: null }) // 保留展开
+      } else {
+        next.push({ ...node, isDir: disk.isDirectory })
+      }
+    }
+    for (const item of items) {
+      if (existing.has(item.name)) continue
+      if (!item.isDirectory && !DOC_EXT.test(item.name)) continue
+      next.push({
+        name: item.name,
+        relPath: parentRelPath ? `${parentRelPath}/${item.name}` : item.name,
+        isDir: item.isDirectory,
+        expanded: false,
+        loading: false,
+        error: null,
+        children: null
+      })
+    }
+    return next.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
+      return a.name.localeCompare(b.name, 'zh')
+    })
+  }
+
+  /** 刷新整个目录树（保留展开状态） */
+  async function refreshTree() {
+    if (!tree) {
+      await loadRoot()
+      return
+    }
+    try {
+      setTree(await refreshTreeNodes(tree, ''))
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  /** 刷新指定文件夹子树 */
+  async function refreshBranch(node) {
+    try {
+      const children = await refreshTreeNodes(node.children ?? [], node.relPath)
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, children, expanded: true, loading: false, error: null }))
       )
     } catch (err) {
       setListError(String(err?.message ?? err))
@@ -344,7 +427,8 @@ export default function Sidebar({
           onContextMenu={(e) =>
             openMenu(e, [
               { label: '新建 MD 文件', onClick: () => startCreate('', 'file') },
-              { label: '新建文件夹', onClick: () => startCreate('', 'folder') }
+              { label: '新建文件夹', onClick: () => startCreate('', 'folder') },
+              { label: '刷新', onClick: () => refreshTree() } // 4.5：感知外部改动
             ])
           }
           aria-expanded={listOpen}
@@ -392,7 +476,8 @@ export default function Sidebar({
                             { label: '新建 MD 文件', onClick: () => startCreate(node.relPath, 'file') },
                             { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') },
                             { label: '重命名', onClick: () => startRename(node) },
-                            { label: '删除', danger: true, onClick: () => startDelete(node) }
+                            { label: '删除', danger: true, onClick: () => startDelete(node) },
+                            { label: '刷新', onClick: () => refreshBranch(node) } // 4.5
                           ]
                         : [
                             { label: '重命名', onClick: () => startRename(node) },
@@ -430,7 +515,9 @@ export default function Sidebar({
           message={`确定删除「${deleteTarget.name}」？此操作不可恢复。`}
           warning={
             deleteTarget.isDir
-              ? '该文件夹将递归删除其中所有内容，版本历史将一并清空。'
+              ? deleteEmpty
+                ? '该文件夹的版本历史将一并清空。'
+                : '该文件夹包含内容，将递归删除其中所有文件，版本历史一并清空。'
               : '该文件的版本历史将一并清空。'
           }
           confirmLabel="删除"

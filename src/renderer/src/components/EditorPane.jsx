@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
+import ConfirmDialog from './ConfirmDialog'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
@@ -17,7 +18,7 @@ function dirOf(relPath) {
 }
 
 export default function EditorPane({ editor, theme, onToggleFocus }) {
-  const { currentFile, content, saveState, dirty, error, loading, setContent, save } = editor
+  const { currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
   const baseDir = dirOf(currentFile ?? '')
@@ -25,6 +26,13 @@ export default function EditorPane({ editor, theme, onToggleFocus }) {
   const [ratio, setRatio] = useState(50) // 分屏比例（编辑区宽度 %）
   const bodyRef = useRef(null)
   const dragRef = useRef(null) // { startX, startRatio }
+
+  // 4.5 外部改动覆盖确认：保存检测到磁盘被外部修改时弹确认（PRD §4.3.6）
+  const [externalConfirm, setExternalConfirm] = useState(false)
+  const handleSave = useCallback(async () => {
+    const r = await save()
+    if (r?.externalChange) setExternalConfirm(true)
+  }, [save])
 
   // 3.7 分屏同步滚动（PRD §4.2.6）双向联动编排。
   // 子组件经 forwardRef 暴露 scrollToLine；drivingRef 记录当前驱动方向，回波忽略；
@@ -66,12 +74,12 @@ export default function EditorPane({ editor, theme, onToggleFocus }) {
     function onKeydown(e) {
       if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault()
-        save()
+        handleSave() // 4.5：检测到外部改动时转确认弹窗
       }
     }
     window.addEventListener('keydown', onKeydown)
     return () => window.removeEventListener('keydown', onKeydown)
-  }, [currentFile, save])
+  }, [currentFile, save, handleSave])
 
   /** 开始拖拽分隔条 */
   function onDividerDown(e) {
@@ -131,13 +139,28 @@ export default function EditorPane({ editor, theme, onToggleFocus }) {
             >
               ⛶
             </button>
-            <span className={`editor__status${dirty ? ' editor__status--dirty' : ''}`}>
-              {saveState === 'saving' ? '保存中…' : dirty ? '未保存' : '已保存'}
+            <span
+              className={`editor__status${dirty ? ' editor__status--dirty' : ''}${
+                externalChange ? ' editor__status--conflict' : ''
+              }`}
+              title={
+                externalChange
+                  ? '磁盘文件已被外部修改，保存被阻止；Ctrl+S 或保存按钮可确认覆盖'
+                  : undefined
+              }
+            >
+              {saveState === 'saving'
+                ? '保存中…'
+                : externalChange
+                  ? '磁盘已变更·保存被阻止'
+                  : dirty
+                    ? '未保存'
+                    : '已保存'}
             </span>
             <button
               type="button"
               className="editor__save"
-              onClick={save}
+              onClick={handleSave}
               disabled={saveState === 'saving' || !dirty}
             >
               保存
@@ -195,6 +218,21 @@ export default function EditorPane({ editor, theme, onToggleFocus }) {
         </div>
       )}
       {error && <p className="editor__error">{error}</p>}
+
+      {/* 4.5 外部改动覆盖确认（PRD §4.3.6） */}
+      {externalConfirm && (
+        <ConfirmDialog
+          title="保存覆盖提示"
+          message="磁盘中的文件已被外部修改。"
+          warning="保存将覆盖外部改动，是否继续？"
+          confirmLabel="覆盖保存"
+          onConfirm={async () => {
+            setExternalConfirm(false)
+            await save(true) // 用户已确认：强制覆盖（跳过检测）
+          }}
+          onCancel={() => setExternalConfirm(false)}
+        />
+      )}
     </div>
   )
 }
