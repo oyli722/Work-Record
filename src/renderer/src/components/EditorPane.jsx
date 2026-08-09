@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
 import ConfirmDialog from './ConfirmDialog'
+import DiffView from './DiffView'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
@@ -17,7 +18,7 @@ function dirOf(relPath) {
   return i === -1 ? '' : relPath.slice(0, i)
 }
 
-export default function EditorPane({ editor, theme, onToggleFocus }) {
+export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
   const { currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
@@ -118,7 +119,15 @@ export default function EditorPane({ editor, theme, onToggleFocus }) {
 
   return (
     <div className="editor">
-      {currentFile ? (
+      {compare ? (
+        // 5.4 对比模式：全屏只读分屏 diff，editor__bar（分屏/编辑/预览/保存等）全部隐藏（用户定案）
+        <DiffView
+          left={compare.left}
+          right={compare.right}
+          leftLabel={compare.leftLabel}
+          rightLabel={compare.rightLabel}
+        />
+      ) : currentFile ? (
         <>
           <div className="editor__bar">
             <span className="editor__file" title={currentFile}>

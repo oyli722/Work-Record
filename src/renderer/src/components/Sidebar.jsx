@@ -7,6 +7,7 @@ import { useState } from 'react'
 import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
+import VersionPanel from './VersionPanel'
 
 const DOC_EXT = /\.(md|txt)$/i
 
@@ -26,7 +27,8 @@ export default function Sidebar({
   listError,
   setListError,
   listLoading,
-  setListLoading
+  setListLoading,
+  onCompareChange
 }) {
   // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
@@ -37,6 +39,7 @@ export default function Sidebar({
   const [renaming, setRenaming] = useState(null) // 重命名中的节点（4.3）
   const [deleteTarget, setDeleteTarget] = useState(null) // 待删除二次确认的节点（4.4）
   const [deleteEmpty, setDeleteEmpty] = useState(true) // 删除目标是否为空文件夹（评审 S1）
+  const [versionPanelFor, setVersionPanelFor] = useState(null) // 打开版本历史面板的文件（5.3）
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -281,6 +284,12 @@ export default function Sidebar({
     setDeleteTarget(null)
   }
 
+  /** 打开版本历史面板（5.3，PRD §4.5.4） */
+  function openVersionPanel(node) {
+    setContextMenu(null)
+    setVersionPanelFor(node.relPath)
+  }
+
   /** 刷新目标目录的子树（新建/后续 CRUD 后调用） */
   async function refreshParent(parentRelPath) {
     if (parentRelPath === '') {
@@ -480,6 +489,7 @@ export default function Sidebar({
                             { label: '刷新', onClick: () => refreshBranch(node) } // 4.5
                           ]
                         : [
+                            { label: '版本历史', onClick: () => openVersionPanel(node) },
                             { label: '重命名', onClick: () => startRename(node) },
                             { label: '删除', danger: true, onClick: () => startDelete(node) }
                           ]
@@ -505,6 +515,16 @@ export default function Sidebar({
           y={contextMenu.y}
           items={contextMenu.items}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* 版本历史面板（5.3/5.4：选中版本触发主区对比） */}
+      {versionPanelFor && (
+        <VersionPanel
+          relPath={versionPanelFor}
+          editor={editor}
+          onCompareChange={onCompareChange}
+          onClose={() => setVersionPanelFor(null)}
         />
       )}
 

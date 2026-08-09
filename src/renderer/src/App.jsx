@@ -32,6 +32,8 @@ export default function App() {
   const [listOpen, setListOpen] = useState(false)
   const [listError, setListError] = useState(null)
   const [listLoading, setListLoading] = useState(false)
+  // 5.4 版本对比：版本面板选中版本时主区进入对比模式（{ left, right, leftLabel, rightLabel } | null）
+  const [compare, setCompare] = useState(null)
 
   useEffect(() => {
     // 启动恢复：有记忆路径则尝试激活；失败（路径失效）时停留在空状态
@@ -90,11 +92,12 @@ export default function App() {
             setListError={setListError}
             listLoading={listLoading}
             setListLoading={setListLoading}
+            onCompareChange={setCompare}
           />
         )}
         <main className="app__main">
           {isActive ? (
-            <EditorPane editor={editor} theme={theme} onToggleFocus={toggleFocus} />
+            <EditorPane editor={editor} theme={theme} onToggleFocus={toggleFocus} compare={compare} />
           ) : isRestoring ? (
             <div className="app__status">
               <p className="app__hint">正在恢复工作区…</p>
