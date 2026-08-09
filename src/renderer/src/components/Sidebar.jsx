@@ -8,12 +8,21 @@ import FileTree, { FolderIcon } from './FileTree'
 
 const DOC_EXT = /\.(md|txt)$/i
 
-export default function Sidebar({ workspace, editor }) {
+export default function Sidebar({
+  workspace,
+  editor,
+  tree,
+  setTree,
+  listOpen,
+  setListOpen,
+  listError,
+  setListError,
+  listLoading,
+  setListLoading
+}) {
+  // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
+  // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
   const [menuOpen, setMenuOpen] = useState(false)
-  const [listOpen, setListOpen] = useState(false) // 目录树展开/收回
-  const [tree, setTree] = useState(null) // 顶层节点数组
-  const [listError, setListError] = useState(null)
-  const [listLoading, setListLoading] = useState(false)
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)

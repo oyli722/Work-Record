@@ -16,7 +16,7 @@ function dirOf(relPath) {
   return i === -1 ? '' : relPath.slice(0, i)
 }
 
-export default function EditorPane({ editor, theme }) {
+export default function EditorPane({ editor, theme, onToggleFocus }) {
   const { currentFile, content, saveState, dirty, error, loading, setContent, save } = editor
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
@@ -121,6 +121,16 @@ export default function EditorPane({ editor, theme }) {
               {modeBtn('edit', '编辑')}
               {modeBtn('preview', '预览')}
             </div>
+            {/* 3.8 专注模式入口：分屏切换旁（focus 时 editor__bar 整体隐藏） */}
+            <button
+              type="button"
+              className="editor__focus"
+              onClick={onToggleFocus}
+              title="专注模式 (F11)"
+              aria-label="专注模式"
+            >
+              ⛶
+            </button>
             <span className={`editor__status${dirty ? ' editor__status--dirty' : ''}`}>
               {saveState === 'saving' ? '保存中…' : dirty ? '未保存' : '已保存'}
             </span>

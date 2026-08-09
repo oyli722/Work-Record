@@ -839,3 +839,110 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
 }
+
+/* ============ 专注模式（3.8，PRD §4.2.7） ============ */
+
+/* 专注时主区占满全窗：顶栏/侧边栏条件渲染为 null，grid 归一行一列；工具条也隐藏 */
+.app--focus {
+  grid-template-rows: 1fr;
+}
+.app--focus .app__body {
+  grid-template-columns: 1fr;
+}
+.app--focus .editor__bar {
+  display: none;
+}
+
+/* 专注浮层根容器：覆盖全窗，默认穿透鼠标（仅热区/浮层面板自身响应） */
+.focus {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* 悬停热区：窗口顶部/左侧边缘细条 */
+.focus__hotzone {
+  position: absolute;
+  pointer-events: auto;
+}
+.focus__hotzone--top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+.focus__hotzone--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 8px;
+}
+
+/* 浮层面板：默认移出视口，显示时滑入（不挤压主区布局） */
+.focus__panel {
+  position: absolute;
+  pointer-events: auto;
+  transition: transform 0.18s ease;
+}
+.focus__panel--top {
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: translateY(-100%);
+}
+.focus__panel--top.focus__panel--show {
+  transform: translateY(0);
+}
+.focus__panel--left {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  transform: translateX(-100%);
+}
+.focus__panel--left.focus__panel--show {
+  transform: translateX(0);
+}
+
+/* 专注模式入口按钮（editor__bar 分屏旁） */
+.editor__focus {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  width: 28px;
+  height: 28px;
+  font-size: var(--font-size-base);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.editor__focus:hover {
+  color: var(--color-text);
+  border-color: var(--color-accent);
+}
+
+/* 顶栏浮层「退出专注」按钮（icon，与主题按钮同尺寸） */
+.topbar__exit-focus {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  width: 32px;
+  height: 32px;
+  font-size: var(--font-size-base);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.topbar__exit-focus:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
