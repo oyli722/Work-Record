@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CloseIcon } from './icons'
 import ContextMenu from './ContextMenu'
 
@@ -16,6 +16,35 @@ export function fileNameOf(relPath) {
 export default function TabBar({ editor, onCloseRequest, onBatchClose }) {
   const { tabs, activeRelPath, activateTab, closeTab, confirmCloseTab } = editor
   const [menu, setMenu] = useState(null) // 右键菜单：{ x, y, relPath }
+  const tabbarRef = useRef(null) // 标签栏滚动容器
+  const tabRefs = useRef(new Map()) // relPath -> 标签元素（活动标签自动滚动）
+
+  // 9.3.1 活动标签切换后自动滚动到可视区（只滚动标签栏，不影响主区）
+  useEffect(() => {
+    const bar = tabbarRef.current
+    const el = tabRefs.current.get(activeRelPath)
+    if (!bar || !el) return
+    const elRect = el.getBoundingClientRect()
+    const barRect = bar.getBoundingClientRect()
+    const tabLeft = elRect.left - barRect.left + bar.scrollLeft
+    const tabRight = tabLeft + el.offsetWidth
+    if (tabLeft < bar.scrollLeft) bar.scrollLeft = tabLeft
+    else if (tabRight > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = tabRight - bar.clientWidth
+  }, [activeRelPath])
+
+  // 9.3.1 鼠标滚轮横向滚动标签栏（仅当标签溢出时劫持，不影响主区滚动）
+  useEffect(() => {
+    const bar = tabbarRef.current
+    if (!bar) return
+    function onWheel(e) {
+      if (bar.scrollWidth <= bar.clientWidth) return // 无横向溢出：放行
+      e.preventDefault()
+      bar.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+    }
+    bar.addEventListener('wheel', onWheel, { passive: false })
+    return () => bar.removeEventListener('wheel', onWheel)
+  }, [])
+
   if (tabs.length === 0) return null
 
   function handleClose(e, relPath) {
@@ -57,7 +86,7 @@ export default function TabBar({ editor, onCloseRequest, onBatchClose }) {
 
   return (
     <>
-      <div className="tabbar" role="tablist">
+      <div className="tabbar" role="tablist" ref={tabbarRef}>
         {tabs.map((tab) => {
           const active = tab.relPath === activeRelPath
           const dirty = tab.saveState === 'dirty'
@@ -66,6 +95,10 @@ export default function TabBar({ editor, onCloseRequest, onBatchClose }) {
               key={tab.relPath}
               role="tab"
               aria-selected={active}
+              ref={(el) => {
+                if (el) tabRefs.current.set(tab.relPath, el)
+                else tabRefs.current.delete(tab.relPath)
+              }}
               className={`tabbar__tab${active ? ' tabbar__tab--active' : ''}`}
               onClick={() => activateTab(tab.relPath)}
               onContextMenu={(e) => openMenu(e, tab.relPath)}
