@@ -827,6 +827,27 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   opacity: 0; /* 文件行占位，与文件夹箭头对齐；hover 亦不显示 */
 }
 
+/* 9.3.2 层级缩进线：随 --indent-width（缩进封顶后的宽度）绘制，每层 14px 一条细线 */
+.filetree__row {
+  position: relative;
+}
+.filetree__row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--indent-width, 0px);
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0 8px,
+    var(--color-border-subtle) 8px 9px,
+    transparent 9px 22px
+  );
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 .filetree__icon {
   flex-shrink: 0;
   color: var(--color-text-tertiary);

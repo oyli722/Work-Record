@@ -101,9 +101,14 @@ export default function FileTree({
   onSubmitRename,
   onCancelRename
 }) {
+  // 9.3.2 缩进封顶：超过 5 层不再加深，防深层挤压内容区（层级缩进线标识）
+  const MAX_INDENT_DEPTH = 5
+  const indent = 8 + Math.min(depth, MAX_INDENT_DEPTH) * 14
+  const rowStyle = { paddingLeft: indent, '--indent-width': `${indent}px` }
+
   // 重命名输入行（替换节点行，保持缩进）
   const renameRow = (node) => (
-    <div className="filetree__create-row" style={{ paddingLeft: 8 + depth * 14 }}>
+    <div className="filetree__create-row" style={{ paddingLeft: indent }}>
       <InlineInput
         defaultValue={node.name}
         onSubmit={onSubmitRename}
@@ -128,7 +133,7 @@ export default function FileTree({
                 <button
                   type="button"
                   className={`filetree__row${node.expanded ? ' filetree__row--open' : ''}`}
-                  style={{ paddingLeft: 8 + depth * 14 }}
+                  style={rowStyle}
                   onClick={() => onToggle(node)}
                   onContextMenu={(e) => {
                     e.preventDefault()
@@ -184,7 +189,7 @@ export default function FileTree({
             <button
               type="button"
               className={`filetree__row${editor.currentFile === node.relPath ? ' filetree__row--active' : ''}`}
-              style={{ paddingLeft: 8 + depth * 14 }}
+              style={rowStyle}
               onClick={() => editor.openFile(node.relPath)}
               onContextMenu={
                 onContextMenu
