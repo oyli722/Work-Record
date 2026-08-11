@@ -9,6 +9,7 @@ import PreviewPane from './PreviewPane'
 import ConfirmDialog from './ConfirmDialog'
 import DiffView from './DiffView'
 import TabBar, { fileNameOf } from './TabBar'
+import { ExpandIcon } from './icons'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
@@ -173,7 +174,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
               title="专注模式 (F11)"
               aria-label="专注模式"
             >
-              ⛶
+              <ExpandIcon width={16} height={16} />
             </button>
             <span
               className={`editor__status${dirty ? ' editor__status--dirty' : ''}${

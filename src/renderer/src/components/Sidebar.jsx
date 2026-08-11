@@ -8,6 +8,7 @@ import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
 import VersionPanel from './VersionPanel'
+import { CloseIcon } from './icons'
 
 const DOC_EXT = /\.(md|txt)$/i
 
@@ -459,7 +460,7 @@ export default function Sidebar({
                     title="从最近列表移除"
                     aria-label={`移除 ${p}`}
                   >
-                    ✕
+                    <CloseIcon width={12} height={12} />
                   </button>
                 </div>
               )

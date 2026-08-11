@@ -3,6 +3,7 @@
 // 5.4 对比模式接入主区；5.5/5.6 回滚/导出按钮在对应子阶段启用（当前禁用占位）。
 import { useEffect, useState } from 'react'
 import ConfirmDialog from './ConfirmDialog'
+import { CloseIcon } from './icons'
 
 const SOURCE_LABEL = { save: '保存', auto: '自动保存', rollback: '回滚' }
 
@@ -136,7 +137,7 @@ export default function VersionPanel({ relPath, editor, onCompareChange, onClose
           aria-label="关闭"
           title="关闭"
         >
-          ✕
+          <CloseIcon width={14} height={14} />
         </button>
       </div>
 

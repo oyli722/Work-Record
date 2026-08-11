@@ -1,5 +1,7 @@
 // 标签栏（阶段 7.2，PRD §4.7.1/4.7.2）：编辑器上方一行
 // 每标签：文件名 + ●未保存 + ✕ 关闭；活动标签高亮；点击切换。
+import { CloseIcon } from './icons'
+
 // 未保存关闭经 onCloseRequest 交由 EditorPane 弹三选（7.3 细化外部改动检测）。
 
 /** 相对路径取文件名 */
@@ -44,7 +46,7 @@ export default function TabBar({ editor, onCloseRequest }) {
               aria-label="关闭标签"
               title="关闭"
             >
-              ✕
+              <CloseIcon width={12} height={12} />
             </button>
           </div>
         )

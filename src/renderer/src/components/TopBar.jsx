@@ -1,3 +1,5 @@
+import { GearIcon, MinimizeIcon } from './icons'
+
 // 顶栏（布局定案 2026-08-09）：极简，仅承载全局操作（标题 / 主题切换 / 设置）。
 // 工作区路径与切换已归入侧边栏顶部（Sidebar），此处不再放置工作区信息。
 // 6.1 主题按钮：眼睛图标三态循环（用户定案）——浅色睁眼 / 深色闭眼 / 跟随系统（半睁+指示点）。
@@ -27,7 +29,7 @@ export default function TopBar({ mode, onToggleTheme, onExitFocus, onOpenSetting
             title="退出专注模式 (Esc)"
             aria-label="退出专注模式"
           >
-            ⤢
+            <MinimizeIcon width={18} height={18} />
           </button>
         )}
         {onOpenSettings && (
@@ -38,7 +40,7 @@ export default function TopBar({ mode, onToggleTheme, onExitFocus, onOpenSetting
             aria-label="设置"
             title="设置"
           >
-            ⚙
+            <GearIcon />
           </button>
         )}
       </div>

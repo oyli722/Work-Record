@@ -4,6 +4,7 @@
 // AI：灰色预留「将在未来版本中提供」；关于：产品信息。
 import { useState } from 'react'
 import ConfirmDialog from './ConfirmDialog'
+import { CloseIcon } from './icons'
 
 const GROUPS = [
   { id: 'appearance', label: '外观' },
@@ -72,7 +73,7 @@ export default function SettingsModal({
         <div className="settings__bar">
           <span className="settings__title">设置</span>
           <button type="button" className="settings__close" onClick={onClose} aria-label="关闭" title="关闭">
-            ✕
+            <CloseIcon width={14} height={14} />
           </button>
         </div>
         <div className="settings__body">
