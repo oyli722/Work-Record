@@ -170,6 +170,15 @@ export default function Sidebar({
     })
   }
 
+  /** 不可变替换目录树中指定节点（9.2.3 递归展开后整体替换） */
+  function replaceNode(nodes, relPath, newNode) {
+    return nodes.map((n) => {
+      if (n.relPath === relPath) return newNode
+      if (n.children) return { ...n, children: replaceNode(n.children, relPath, newNode) }
+      return n
+    })
+  }
+
   /** 加载根层节点（首次展开时） */
   async function loadRoot() {
     setListLoading(true)
@@ -202,6 +211,37 @@ export default function Sidebar({
         updateNode(t, node.relPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
       )
     }
+  }
+
+  /** 递归展开/收起整个子树（9.2.3 用户反馈：点击箭头，子文件夹递归展开）。
+      展开：逐层懒加载所有子文件夹；收起：目标节点整棵折叠。 */
+  async function toggleFolderRecursive(node) {
+    if (node.expanded) {
+      setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null })))
+      return
+    }
+    setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: true, loading: true })))
+    try {
+      const expandedNode = await expandNode(node)
+      setTree((t) => replaceNode(t, node.relPath, expandedNode))
+    } catch (err) {
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+      )
+    }
+  }
+
+  /** 递归展开节点：拉取每层子级并展开所有子文件夹（返回更新后的节点树） */
+  async function expandNode(node) {
+    const items = await window.mework.fs.listDetail(node.relPath)
+    const children = buildNodes(items, node.relPath)
+    const expandedChildren = []
+    for (const child of children) {
+      expandedChildren.push(
+        child.isDir ? await expandNode({ ...child, expanded: true, loading: false }) : child
+      )
+    }
+    return { ...node, expanded: true, loading: false, error: null, children: expandedChildren }
   }
 
   function toggleList() {
@@ -549,6 +589,7 @@ export default function Sidebar({
                   nodes={tree}
                   editor={editor}
                   onToggle={toggleFolder}
+                  onArrowToggle={toggleFolderRecursive}
                   onContextMenu={(e, node) =>
                     openMenu(
                       e,

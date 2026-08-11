@@ -92,6 +92,7 @@ export default function FileTree({
   nodes,
   editor,
   onToggle,
+  onArrowToggle,
   depth = 0,
   onContextMenu,
   creating,
@@ -142,7 +143,17 @@ export default function FileTree({
                   }}
                   title={node.relPath}
                 >
-                  <span className="filetree__arrow" aria-hidden="true">
+                  <span
+                    className="filetree__arrow"
+                    role="button"
+                    tabIndex={-1}
+                    aria-label={node.expanded ? '收起子文件夹' : '展开子文件夹'}
+                    title={node.expanded ? '递归收起子文件夹' : '递归展开子文件夹'}
+                    onClick={(e) => {
+                      e.stopPropagation() // 不触发整行单层展开
+                      onArrowToggle?.(node)
+                    }}
+                  >
                     {node.expanded ? '▾' : '▸'}
                   </span>
                   <FolderIcon open={node.expanded} />
