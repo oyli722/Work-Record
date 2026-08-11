@@ -813,10 +813,18 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   font-size: 9px;
   color: var(--color-text-tertiary);
   text-align: center;
+  opacity: 0; /* 9.2.3：平时隐藏，hover 文件夹行才显示（用户定案） */
+  transition:
+    opacity 0.12s ease,
+    color 0.12s ease;
+}
+.filetree__row:hover .filetree__arrow:not(.filetree__arrow--spacer) {
+  opacity: 1;
+  color: var(--color-text-secondary);
 }
 
 .filetree__arrow--spacer {
-  visibility: hidden; /* 文件行占位，与文件夹箭头对齐 */
+  opacity: 0; /* 文件行占位，与文件夹箭头对齐；hover 亦不显示 */
 }
 
 .filetree__icon {
