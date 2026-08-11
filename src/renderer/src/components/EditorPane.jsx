@@ -37,28 +37,50 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
     if (r?.externalChange) setExternalConfirm(true)
   }, [save])
 
-  // 7.2/7.3 关闭未保存标签：三选 保存/放弃/取消；「保存」遇外部改动（7.3）→ 覆盖确认后再关
-  const [closeRequest, setCloseRequest] = useState(null)
+  // 7.2/7.3 关闭未保存标签：三选 保存/放弃/取消；「保存」遇外部改动（7.3）→ 覆盖确认后再关。
+  // 9.2.2 批量关闭：closeQueue 为未保存标签队列，逐个弹三选（用户定案）；取消则中止批量。
+  const [closeQueue, setCloseQueue] = useState([])
   const [closeExternalConfirm, setCloseExternalConfirm] = useState(null) // 覆盖确认（关闭流程）
+  const closeTarget = closeQueue[0] ?? null
+
+  /** 9.2.2 批量关闭入口：已保存直接关；未保存逐个入队三选 */
+  function startBatchClose(relPaths) {
+    const dirty = []
+    for (const p of relPaths) {
+      const { needsConfirm } = editor.closeTab(p)
+      if (needsConfirm) dirty.push(p)
+      else editor.confirmCloseTab(p)
+    }
+    if (dirty.length > 0) setCloseQueue((q) => [...q, ...dirty])
+  }
+
   async function handleCloseSave() {
-    const relPath = closeRequest
-    setCloseRequest(null)
+    const relPath = closeTarget
     editor.activateTab(relPath)
     const r = await save()
-    if (r.ok) editor.confirmCloseTab(relPath)
-    else if (r.externalChange) setCloseExternalConfirm(relPath) // 磁盘被外部修改：需覆盖确认
+    if (r.ok) {
+      editor.confirmCloseTab(relPath)
+      setCloseQueue((q) => q.filter((x) => x !== relPath))
+    } else if (r.externalChange) {
+      setCloseExternalConfirm(relPath) // 覆盖确认期间队列保持，不弹下一个
+    } else {
+      setCloseQueue([]) // 保存失败：中止批量，保留现场
+    }
   }
   function handleCloseDiscard() {
-    const relPath = closeRequest
-    setCloseRequest(null)
+    const relPath = closeTarget
     editor.confirmCloseTab(relPath) // 放弃：丢弃未保存内容，无需写盘检测
+    setCloseQueue((q) => q.filter((x) => x !== relPath))
   }
   async function handleCloseOverwrite() {
     const relPath = closeExternalConfirm
     setCloseExternalConfirm(null)
     editor.activateTab(relPath)
     const r = await save(true) // 用户确认覆盖外部改动（PRD §4.3.6）
-    if (r.ok) editor.confirmCloseTab(relPath)
+    if (r.ok) {
+      editor.confirmCloseTab(relPath)
+      setCloseQueue((q) => q.filter((x) => x !== relPath))
+    }
   }
 
   // 3.7 分屏同步滚动（PRD §4.2.6）双向联动编排。
@@ -156,7 +178,11 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
       ) : currentFile ? (
         <>
           {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
-          <TabBar editor={editor} onCloseRequest={setCloseRequest} />
+          <TabBar
+            editor={editor}
+            onCloseRequest={(relPath) => setCloseQueue([relPath])}
+            onBatchClose={startBatchClose}
+          />
           <div className="editor__bar">
             <span className="editor__file" title={currentFile}>
               {currentFile}
@@ -269,11 +295,11 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
         />
       )}
 
-      {/* 7.2 关闭未保存标签三选（7.3 细化外部改动检测） */}
-      {closeRequest && (
+      {/* 7.2 关闭未保存标签三选（7.3 细化外部改动检测；9.2.2 批量逐个弹） */}
+      {closeTarget && (
         <ConfirmDialog
           title="关闭标签"
-          message={`「${fileNameOf(closeRequest)}」有未保存的修改。`}
+          message={`「${fileNameOf(closeTarget)}」有未保存的修改。`}
           warning="保存将保留修改并关闭标签；放弃将丢弃未保存内容。"
           confirmLabel="保存"
           confirmDanger={false}
@@ -281,7 +307,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
           altDanger
           onConfirm={handleCloseSave}
           onAlt={handleCloseDiscard}
-          onCancel={() => setCloseRequest(null)}
+          onCancel={() => setCloseQueue([])} // 取消：中止批量，保留未保存标签
         />
       )}
 
