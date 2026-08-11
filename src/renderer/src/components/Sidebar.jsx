@@ -40,6 +40,25 @@ export default function Sidebar({
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // 9.2.1：菜单打开时点击外部 / Esc 关闭（右键弹菜单后需点击外部收起）
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDocMouseDown(e) {
+      const el = e.target
+      if (el?.closest?.('.sidebar__menu') || el?.closest?.('.sidebar__ws-btn')) return
+      setMenuOpen(false)
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
+
   // 8.3 侧边栏拖拽调宽：宽度经 --sidebar-width 变量驱动 grid 列，持久化 localStorage
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     try {
@@ -417,7 +436,14 @@ export default function Sidebar({
       {/* 8.3 右缘拖拽调宽 */}
       <div className="sidebar__resizer" onMouseDown={onResizeDown} title="拖拽调整侧边栏宽度" />
       {/* 工作区区（侧边栏顶部） */}
-      <div className="sidebar__workspace">
+      {/* 9.2.1：右键工作区区域弹切换菜单（与按钮点击同菜单） */}
+      <div
+        className="sidebar__workspace"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setMenuOpen(true)
+        }}
+      >
         <button
           type="button"
           className="sidebar__ws-btn"
