@@ -61,7 +61,8 @@ button {
 }
 
 .app__hint {
-  opacity: 0.6;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
 }
 
 /* ============ 标签栏（阶段 7.2） ============ */
@@ -471,7 +472,8 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
 }
 
 .editor__empty-hint {
-  opacity: 0.55;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
 }
 
 .editor__error {
