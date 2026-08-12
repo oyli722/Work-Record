@@ -22,18 +22,42 @@ function splitName(fullName) {
 export default function NewFileModal({ defaultName, onConfirm, onCancel }) {
   const [parts, setParts] = useState(() => splitName(defaultName))
   const inputRef = useRef(null)
+  const maskRef = useRef(null)
 
   useEffect(() => {
     inputRef.current?.focus()
     inputRef.current?.select() // 基名全选：直接输入即整体替换
   }, [])
 
+  // 9.2.5 焦点圈 + Esc 关闭 + 关闭还原焦点（与确认弹窗一致）
   useEffect(() => {
+    const prev = document.activeElement
     function onKey(e) {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape') {
+        onCancel()
+        return
+      }
+      if (e.key === 'Tab') {
+        const els = maskRef.current
+          ? [...maskRef.current.querySelectorAll('button, input, select:not(:disabled)')]
+          : []
+        if (els.length === 0) return
+        const first = els[0]
+        const last = els[els.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     }
     document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      prev?.focus?.()
+    }
   }, [onCancel])
 
   const submit = () => {
@@ -45,6 +69,7 @@ export default function NewFileModal({ defaultName, onConfirm, onCancel }) {
   return (
     <div
       className="confirm-dialog__mask"
+      ref={maskRef}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onCancel()
       }}

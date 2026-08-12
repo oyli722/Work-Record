@@ -1105,8 +1105,9 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.context-menu__item:hover:not(.context-menu__item--disabled) {
-  background: var(--color-accent-subtle);
+.context-menu__item:hover:not(.context-menu__item--disabled),
+.context-menu__item:focus:not(.context-menu__item--disabled) {
+  background: var(--color-accent-subtle); /* 9.2.5：键盘导航聚焦项同样高亮 */
 }
 .context-menu__item--danger {
   color: var(--color-danger);
