@@ -1550,8 +1550,8 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   word-break: break-word;
 }
 .diffview__row--del .diffview__cell:first-child {
-  background: var(--color-danger-subtle); /* 删除：左栏红 */
+  background: var(--color-diff-del); /* 删除：左栏低饱和红（9.1.3 视觉收敛） */
 }
 .diffview__row--add .diffview__cell:last-child {
-  background: var(--color-success-subtle); /* 新增：右栏绿 */
+  background: var(--color-diff-add); /* 新增：右栏低饱和绿（9.1.3 视觉收敛） */
 }

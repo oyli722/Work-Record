@@ -41,6 +41,10 @@
   --color-on-danger: #ffffff; /* 危险按钮上的文字 */
   --color-active-line: rgba(0, 0, 0, 0.035); /* 编辑器当前行（浅色） */
 
+  /* ---- diff 视图底色（9.1.3 视觉收敛：低饱和红/绿，与共享 danger/success-subtle 解耦） ---- */
+  --color-diff-del: #f9edec; /* 删除：极低饱和暖玫瑰 */
+  --color-diff-add: #edf6f0; /* 新增：极低饱和薄荷 */
+
   /* ---- 阅读面（暖纸色，样式确认 2026-08-09）----
      内容区 / 编辑器 / 预览的基础色，与冷色玻璃外壳形成「桌上摊开笔记」对比。
      由用户确认采纳（见《进度看板》待办区登记）。 */
@@ -124,6 +128,10 @@
   --color-overlay: rgba(0, 0, 0, 0.5);
   --color-on-danger: #ffffff;
   --color-active-line: rgba(255, 255, 255, 0.04);
+
+  /* diff 视图底色（9.1.3 视觉收敛：深色用语义色低透明度） */
+  --color-diff-del: rgba(255, 69, 58, 0.12);
+  --color-diff-add: rgba(48, 209, 88, 0.12);
 
   /* 深色阅读面：暖纸色在暗背景下取暖黑（#21201e），与外壳冷黑区分 */
   --color-paper: #21201e;
