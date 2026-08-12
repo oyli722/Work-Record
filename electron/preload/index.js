@@ -53,7 +53,9 @@ const api = {
   win: {
     openExternal: (url) => ipcRenderer.invoke('win:open_external', url),
     /** 在系统资源管理器中定位（文件）/ 打开（文件夹、工作区根）。relPath 为工作区相对路径，'.' 即根 */
-    reveal: (relPath, isDir) => ipcRenderer.invoke('win:reveal', relPath, isDir)
+    reveal: (relPath, isDir) => ipcRenderer.invoke('win:reveal', relPath, isDir),
+    /** 应用版本号（9.3.5）：动态读取 package.json version，关于页展示 */
+    getVersion: () => ipcRenderer.invoke('win:get_app_version')
   }
 }
 

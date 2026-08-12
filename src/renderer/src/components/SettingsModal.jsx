@@ -2,7 +2,7 @@
 // 外观：主题三态（浅/深/跟随系统）+ 字体三选（Inter/系统/等宽）
 // 编辑器：自动保存开关 / 防抖间隔 / 字号；工作区：当前路径 + 更换；
 // AI：灰色预留「将在未来版本中提供」；关于：产品信息。
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import ConfirmDialog from './ConfirmDialog'
 import { CloseIcon } from './icons'
 
@@ -28,6 +28,11 @@ export default function SettingsModal({
   onClose
 }) {
   const [group, setGroup] = useState('appearance')
+  // 9.3.5 关于页版本号动态化（阶段 8.4 O1）：主进程 app.getVersion() 动态读取，不再硬编码
+  const [appVersion, setAppVersion] = useState(null)
+  useEffect(() => {
+    window.mework?.win?.getVersion?.().then(setAppVersion).catch(() => {})
+  }, [])
 
   const radio = (name, value, current, onChange, label) => (
     <label key={value} className="settings__radio">
@@ -161,7 +166,7 @@ export default function SettingsModal({
             {group === 'about' && (
               <>
                 <p className="settings__about-name">MeWork</p>
-                <p className="settings__about-line">版本 v1.0.0-mvp</p>
+                <p className="settings__about-line">版本 {appVersion ? `v${appVersion}` : '…'}</p>
                 <p className="settings__about-line">本地工作记录管理桌面应用</p>
               </>
             )}

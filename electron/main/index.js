@@ -132,6 +132,10 @@ function registerIpcHandlers() {
     }
   })
 
+  // 9.3.5 应用版本号（阶段 8.4 O1）：动态读取 app.getVersion()（源自 package.json），
+  // 关于页不再硬编码；打包后同样返回 bundle 版本。
+  ipcMain.handle('win:get_app_version', () => app.getVersion())
+
   // 9.2.8 资源管理器定位/打开（PRD §3.1.2 前缀 win:）：渲染进程请求在系统资源管理器中
   // 定位文件（showItemInFolder）或打开文件夹/工作区根（openPath）。
   // 绝对路径经 fs-ops.resolveAbsolute 沙箱解析（PRD §7.1），不直接信任渲染进程拼接路径。
