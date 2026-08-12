@@ -14,7 +14,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { Compartment } from '@codemirror/state'
 
 const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
-  { value, onChange, theme, onTopLineChange },
+  { value, onChange, theme, onTopLineChange, onCursorLineChange },
   ref
 ) {
   const containerRef = useRef(null)
@@ -25,6 +25,9 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
   onChangeRef.current = onChange
   const onTopLineChangeRef = useRef(onTopLineChange)
   onTopLineChangeRef.current = onTopLineChange
+  // 9.2.7 光标行联动：编辑/导航时上报光标所在行，供预览区跟随
+  const onCursorLineChangeRef = useRef(onCursorLineChange)
+  onCursorLineChangeRef.current = onCursorLineChange
   // programmatic 滚动抑制：外部驱动滚动期间不上报（防双向联动回环）
   const progRef = useRef(false)
   const progTimerRef = useRef(0)
@@ -45,6 +48,24 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
           progRef.current = false
         }, 60) // 滚动停稳后恢复上报
         view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'start' }) })
+      },
+      /** 9.2.7：当前光标所在行（供父级模式切换时恢复视图到光标） */
+      getCursorLine() {
+        const view = viewRef.current
+        if (!view) return 1
+        return view.state.doc.lineAt(view.state.selection.main.head).number
+      },
+      /** 9.2.7：滚动到光标处。display:none 再显示后浏览器会把 scrollTop 归零，
+          光标（state 内）仍在但视口回顶；切回编辑/分屏时显式滚回光标位置。 */
+      scrollToCursor() {
+        const view = viewRef.current
+        if (!view) return
+        progRef.current = true
+        clearTimeout(progTimerRef.current)
+        progTimerRef.current = setTimeout(() => {
+          progRef.current = false
+        }, 60)
+        view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: 'start' }) })
       }
     }),
     []
@@ -65,6 +86,13 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
           // 7.1：外部替换（标签切换/加载）抑制 onChange，避免误标 dirty（S-3.2-1）
           if (update.docChanged && !suppressChangeRef.current) {
             onChangeRef.current(update.state.doc.toString())
+          }
+          // 9.2.7：光标位置变化（键入/点击/方向键/外部替换后选择复位）上报光标所在行，
+          // 供预览区跟随。外部 value 同步不抑制本上报：换文件/切标签时预览应随光标回位。
+          if (update.selectionSet || update.docChanged) {
+            const head = update.state.selection.main.head
+            const line = update.state.doc.lineAt(head).number
+            onCursorLineChangeRef.current?.(line)
           }
         })
       ],

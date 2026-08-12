@@ -40,7 +40,8 @@ export default [
         localStorage: 'readonly',
         console: 'readonly',
         setTimeout: 'readonly',
-        clearTimeout: 'readonly'
+        clearTimeout: 'readonly',
+        ResizeObserver: 'readonly' // 9.2.7 预览锚点重建（隐藏→显示触发）
       }
     },
     rules: {

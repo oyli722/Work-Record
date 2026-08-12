@@ -247,6 +247,10 @@ button {
 .editor__pane--full {
   flex: 1 1 100%;
 }
+/* 9.2.7 三态常驻挂载：隐藏 pane 用 display:none（组件保持挂载，保留光标/滚动状态） */
+.editor__pane--hidden {
+  display: none;
+}
 
 .editor__divider {
   flex: 0 0 5px;

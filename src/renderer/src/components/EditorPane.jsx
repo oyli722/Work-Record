@@ -90,10 +90,14 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
   const previewScrollRef = useRef(null)
   const drivingRef = useRef(null) // 'editor' | 'preview' | null
   const driveTimerRef = useRef(0)
+  // 9.2.7：光标移动后短时忽略编辑器滚动上报——输入时光标变化会连带编辑器自动滚动
+  // 到光标处（触发顶部行上报），若立即联动预览会以顶部行覆盖「光标行对齐」目标。
+  // 窗口期内以光标行为准（预览跟随光标），窗口过后恢复顶部行联动。
+  const cursorPriorityUntilRef = useRef(0)
 
-  // 编辑区滚动 → 驱动预览区。守卫语义（评审 S1）：对方（预览）驱动中，
-  // 编辑区的 programmatic 回波应忽略；自己驱动期间置 drivingRef 并在延时后清除。
-  const handleEditorTopLine = useCallback((line) => {
+  /** 驱动预览滚动到指定行。守卫语义（评审 S1）：对方（预览）驱动中忽略；
+      自己驱动期间置 drivingRef 并在延时后清除，防 programmatic 回波成环。 */
+  const drivePreview = useCallback((line) => {
     if (drivingRef.current === 'preview') return
     drivingRef.current = 'editor'
     clearTimeout(driveTimerRef.current)
@@ -103,19 +107,57 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
     previewScrollRef.current?.scrollToLine(line)
   }, [])
 
+  // 编辑区滚动 → 驱动预览区（顶部行对齐）。
+  const handleEditorTopLine = useCallback(
+    (line) => {
+      if (Date.now() < cursorPriorityUntilRef.current) return // 光标对齐优先
+      drivePreview(line)
+    },
+    [drivePreview]
+  )
+
+  // 9.2.7 编辑区光标变化 → 驱动预览区（光标行对齐）。键入/点击/方向键导航时
+  // 预览跟随光标所在行（修文件尾部编辑预览不同步）；光标优先级窗口抑制连带滚动。
+  const handleEditorCursorLine = useCallback(
+    (line) => {
+      cursorPriorityUntilRef.current = Date.now() + 120
+      drivePreview(line)
+    },
+    [drivePreview]
+  )
+
   // 预览区滚动 → 驱动编辑区。守卫语义对称：编辑驱动中忽略预览区回波。
-  const handlePreviewTopLine = useCallback((line) => {
-    if (drivingRef.current === 'editor') return
-    drivingRef.current = 'preview'
-    clearTimeout(driveTimerRef.current)
-    driveTimerRef.current = setTimeout(() => {
-      drivingRef.current = null
-    }, 80)
-    editorScrollRef.current?.scrollToLine(line)
-  }, [])
+  const handlePreviewTopLine = useCallback(
+    (line) => {
+      if (drivingRef.current === 'editor') return
+      drivingRef.current = 'preview'
+      clearTimeout(driveTimerRef.current)
+      driveTimerRef.current = setTimeout(() => {
+        drivingRef.current = null
+      }, 80)
+      editorScrollRef.current?.scrollToLine(line)
+    },
+    []
+  )
 
   // 卸载清理联动定时器
   useEffect(() => () => clearTimeout(driveTimerRef.current), [])
+
+  // 9.2.7 三态切换保留光标位置：编辑器/预览区常驻挂载（display:none 隐藏），
+  // 但浏览器会把隐藏元素的 scrollTop 归零；切换回来时显式把视图恢复到光标处——
+  // 编辑器滚到光标所在行、预览对齐光标所在行（scrollToLine 走待定机制，隐藏后自愈）。
+  useEffect(() => {
+    if (!currentFile) return
+    if (mode !== 'preview') {
+      // 编辑器可见：滚动到光标（光标在 state 内未丢，视口被归零）
+      editorScrollRef.current?.scrollToCursor()
+    }
+    if (mode !== 'edit') {
+      // 预览可见：对齐到光标所在行
+      previewScrollRef.current?.scrollToLine(editorScrollRef.current?.getCursorLine() ?? 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
 
   // Ctrl+S 手动保存（PRD §4.2.3；无文件时不注册，避免误触发「尚未打开文件」错误）
   useEffect(() => {
@@ -231,44 +273,42 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
           </div>
 
           <div className="editor__body" ref={bodyRef}>
-            {mode === 'preview' ? (
-              <div className="editor__pane editor__pane--preview editor__pane--full">
-                <PreviewPane content={content} isMarkdown={isMarkdown} baseDir={baseDir} />
-              </div>
-            ) : (
-              <div
-                className="editor__pane editor__pane--edit"
-                style={mode === 'edit' ? { flex: '1 1 100%' } : { flex: `0 0 ${ratio}%` }}
-              >
-                <CodeMirrorEditor
-                  ref={editorScrollRef}
-                  value={content}
-                  onChange={setContent}
-                  theme={theme}
-                  onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
-                />
-              </div>
-            )}
+            {/* 9.2.7 编辑区常驻挂载：三态切换不卸载，保留光标/滚动；preview 模式 CSS 隐藏 */}
+            <div
+              className={`editor__pane editor__pane--edit${mode === 'preview' ? ' editor__pane--hidden' : ''}`}
+              style={mode === 'split' ? { flex: `0 0 ${ratio}%` } : { flex: '1 1 100%' }}
+            >
+              <CodeMirrorEditor
+                ref={editorScrollRef}
+                value={content}
+                onChange={setContent}
+                theme={theme}
+                onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
+                onCursorLineChange={mode === 'split' ? handleEditorCursorLine : undefined}
+              />
+            </div>
             {mode === 'split' && (
-              <>
-                <div
-                  className="editor__divider"
-                  onMouseDown={onDividerDown}
-                  role="separator"
-                  aria-orientation="vertical"
-                  title="拖拽调整分屏比例"
-                />
-                <div className="editor__pane editor__pane--preview">
-                  <PreviewPane
-                    ref={previewScrollRef}
-                    content={content}
-                    isMarkdown={isMarkdown}
-                    baseDir={baseDir}
-                    onTopLineChange={handlePreviewTopLine}
-                  />
-                </div>
-              </>
+              <div
+                className="editor__divider"
+                onMouseDown={onDividerDown}
+                role="separator"
+                aria-orientation="vertical"
+                title="拖拽调整分屏比例"
+              />
             )}
+            {/* 9.2.7 预览区常驻挂载：保留滚动位置；edit 模式 CSS 隐藏 */}
+            <div
+              className={`editor__pane editor__pane--preview${mode === 'edit' ? ' editor__pane--hidden' : ''}`}
+              style={mode === 'preview' ? { flex: '1 1 100%' } : { flex: '1 1 0' }}
+            >
+              <PreviewPane
+                ref={previewScrollRef}
+                content={content}
+                isMarkdown={isMarkdown}
+                baseDir={baseDir}
+                onTopLineChange={mode === 'split' ? handlePreviewTopLine : undefined}
+              />
+            </div>
           </div>
         </>
       ) : (
