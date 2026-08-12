@@ -1170,6 +1170,30 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   justify-content: flex-end;
   gap: var(--space-2);
 }
+/* 新建文件弹窗（9.2.8）：文件名 + 后缀选择行 */
+.newfile__fields {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.newfile__name {
+  flex: 1;
+  min-width: 0;
+}
+.newfile__suffix {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.newfile__suffix:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
 .confirm-dialog__btn {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);

@@ -47,9 +47,11 @@ const api = {
     status: () => ipcRenderer.invoke('fs:workspace_status')
   },
 
-  /** 系统级操作（阶段 3.6）：外部链接用系统浏览器/默认程序打开（PRD §4.4.3） */
+  /** 系统级操作：外部链接用系统浏览器打开（3.6，PRD §4.4.3）；资源管理器定位（9.2.8） */
   win: {
-    openExternal: (url) => ipcRenderer.invoke('win:open_external', url)
+    openExternal: (url) => ipcRenderer.invoke('win:open_external', url),
+    /** 在系统资源管理器中定位（文件）/ 打开（文件夹、工作区根）。relPath 为工作区相对路径，'.' 即根 */
+    reveal: (relPath, isDir) => ipcRenderer.invoke('win:reveal', relPath, isDir)
   }
 }
 

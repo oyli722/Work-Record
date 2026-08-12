@@ -133,6 +133,13 @@ export function createFsOps(guard) {
         mtimeMs: info.mtimeMs,
         size: info.size
       }
+    },
+
+    /** 解析工作区根内相对路径为绝对路径（9.2.8 资源管理器定位等系统操作用）。
+        仅沙箱校验后返回绝对路径，不做磁盘访问；相对工作区根，'.' 解析为根目录。
+        绝对路径只在主进程内使用（shell 系统调用），不外泄给渲染进程。 */
+    async resolveAbsolute(relPath) {
+      return safe(relPath)
     }
   }
 }

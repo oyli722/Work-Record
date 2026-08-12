@@ -7,10 +7,15 @@ import { useEffect, useRef, useState } from 'react'
 import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
 import ConfirmDialog from './ConfirmDialog'
+import NewFileModal from './NewFileModal'
 import VersionPanel from './VersionPanel'
 import { CloseIcon } from './icons'
 
 const DOC_EXT = /\.(md|txt)$/i
+// 9.2.8 目录树范围（用户定案：当前仅支持 无后缀 / .md / .txt）：
+// md/txt 正常显示；无后缀文件（不含「.」或 . 开头的点文件）也显示。
+// 其余后缀（yaml/js 等）随 V1.1 格式注册表扩展。
+const isDocFile = (name) => DOC_EXT.test(name) || !name.includes('.') || name.startsWith('.')
 
 // 8.3 侧边栏拖拽调宽：宽度范围 + 默认（--sidebar-width 驱动 grid 列）
 const SIDEBAR_MIN = 160
@@ -106,6 +111,7 @@ export default function Sidebar({
   const [deleteTarget, setDeleteTarget] = useState(null) // 待删除二次确认的节点（4.4）
   const [deleteEmpty, setDeleteEmpty] = useState(true) // 删除目标是否为空文件夹（评审 S1）
   const [versionPanelFor, setVersionPanelFor] = useState(null) // 打开版本历史面板的文件（5.3）
+  const [newFileModal, setNewFileModal] = useState(null) // 新建文件弹窗（9.2.8：{ relPath, name }）
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
@@ -147,7 +153,7 @@ export default function Sidebar({
   function buildNodes(items, parentPath) {
     const nodes = []
     for (const item of items) {
-      if (!item.isDirectory && !DOC_EXT.test(item.name)) continue
+      if (!item.isDirectory && !isDocFile(item.name)) continue
       nodes.push({
         name: item.name,
         relPath: parentPath ? `${parentPath}/${item.name}` : item.name,
@@ -345,6 +351,64 @@ export default function Sidebar({
     setCreating(null)
   }
 
+  /** 9.2.8 新建文件（先建默认名再改，用户定案）：立即以默认名建空文件并打开，
+      刷新父目录后弹窗让用户改名称/后缀；取消则保留默认名。默认名 uniqueName 去重。 */
+  async function startCreateFile(parentRelPath) {
+    setContextMenu(null)
+    try {
+      const name = await uniqueName(parentRelPath, '未命名.md')
+      const relPath = parentRelPath ? `${parentRelPath}/${name}` : name
+      await window.mework.fs.writeFile(relPath, '') // 空文件
+      await editor.openFile(relPath) // 打开
+      await refreshParent(parentRelPath) // 新文件入树
+      setNewFileModal({ relPath, name })
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  /** 9.2.8 提交新建文件改名（弹窗确定）：重命名 + 同步打开标签与树。重名预检拒绝（评审 P3 同款）。 */
+  async function submitNewFileRename(rawName) {
+    const { relPath } = newFileModal
+    setNewFileModal(null)
+    const newName = rawName.trim().replace(/[/\\]/g, '-')
+    if (!newName) return // 空名：保留默认名
+    const parentRelPath = dirOf(relPath)
+    const oldName = relPath.slice(relPath.lastIndexOf('/') + 1)
+    if (newName === oldName) return // 未改名
+    const newRelPath = parentRelPath ? `${parentRelPath}/${newName}` : newName
+    let targetExists = false
+    try {
+      targetExists = (await window.mework.fs.stat(newRelPath)).exists
+    } catch {
+      targetExists = false // 目标不存在（ENOENT）
+    }
+    if (targetExists) {
+      setListError(`已存在同名「${newName}」，保留默认名「${oldName}」，可在右键菜单重命名。`)
+      return
+    }
+    try {
+      await window.mework.fs.renameWithVersions(relPath, newRelPath)
+      editor.renameCurrentFile(relPath, newRelPath)
+      await refreshParent(parentRelPath)
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
+  /** 9.2.8 在资源管理器中定位/打开：文件定位（showItemInFolder）、文件夹/工作区根打开（openPath）。 */
+  async function revealInExplorer(node) {
+    setContextMenu(null)
+    const relPath = node ? node.relPath : '.'
+    const isDir = node ? node.isDir : true
+    try {
+      const r = await window.mework.win.reveal(relPath, isDir)
+      if (!r.ok) setListError(String(r.reason ?? '无法打开资源管理器'))
+    } catch (err) {
+      setListError(String(err?.message ?? err))
+    }
+  }
+
   /** 开始重命名（4.3）：节点行转内联输入 */
   function startRename(node) {
     setContextMenu(null)
@@ -465,7 +529,7 @@ export default function Sidebar({
     }
     for (const item of items) {
       if (existing.has(item.name)) continue
-      if (!item.isDirectory && !DOC_EXT.test(item.name)) continue
+      if (!item.isDirectory && !isDocFile(item.name)) continue
       next.push({
         name: item.name,
         relPath: parentRelPath ? `${parentRelPath}/${item.name}` : item.name,
@@ -589,8 +653,9 @@ export default function Sidebar({
           onClick={toggleList}
           onContextMenu={(e) =>
             openMenu(e, [
-              { label: '新建 MD 文件', onClick: () => startCreate('', 'file') },
+              { label: '新建文件', onClick: () => startCreateFile('') },
               { label: '新建文件夹', onClick: () => startCreate('', 'folder') },
+              { label: '在资源管理器中打开', onClick: () => revealInExplorer(null) },
               { label: '刷新', onClick: () => refreshTree() } // 4.5：感知外部改动
             ])
           }
@@ -637,19 +702,21 @@ export default function Sidebar({
                     node.isDir
                       ? [
                           {
-                            label: '新建 MD 文件',
-                            onClick: () => startCreate(node.relPath, 'file')
+                            label: '新建文件',
+                            onClick: () => startCreateFile(node.relPath)
                           },
                           {
                             label: '新建文件夹',
                             onClick: () => startCreate(node.relPath, 'folder')
                           },
+                          { label: '在资源管理器中打开', onClick: () => revealInExplorer(node) },
                           { label: '重命名', onClick: () => startRename(node) },
                           { label: '删除', danger: true, onClick: () => startDelete(node) },
                           { label: '刷新', onClick: () => refreshBranch(node) } // 4.5
                         ]
                       : [
                           { label: '版本历史', onClick: () => openVersionPanel(node) },
+                          { label: '在资源管理器中打开', onClick: () => revealInExplorer(node) },
                           { label: '重命名', onClick: () => startRename(node) },
                           { label: '删除', danger: true, onClick: () => startDelete(node) }
                         ]
@@ -684,6 +751,15 @@ export default function Sidebar({
           editor={editor}
           onCompareChange={onCompareChange}
           onClose={() => setVersionPanelFor(null)}
+        />
+      )}
+
+      {/* 9.2.8 新建文件弹窗（先建默认名再改）：文件已创建并打开，此处改名/后缀 */}
+      {newFileModal && (
+        <NewFileModal
+          defaultName={newFileModal.name}
+          onConfirm={submitNewFileRename}
+          onCancel={() => setNewFileModal(null)}
         />
       )}
 

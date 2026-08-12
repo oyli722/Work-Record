@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { isExternalLink } from '../../src/shared/link-policy'
+import { getActiveFs } from './storage/fs-context.mjs'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 import { registerVersionHandlers } from './ipc/version-handlers.mjs'
@@ -128,6 +129,24 @@ function registerIpcHandlers() {
     } catch (err) {
       console.error('[main] openExternal 失败:', err)
       return { ok: false, reason: 'open-failed' }
+    }
+  })
+
+  // 9.2.8 资源管理器定位/打开（PRD §3.1.2 前缀 win:）：渲染进程请求在系统资源管理器中
+  // 定位文件（showItemInFolder）或打开文件夹/工作区根（openPath）。
+  // 绝对路径经 fs-ops.resolveAbsolute 沙箱解析（PRD §7.1），不直接信任渲染进程拼接路径。
+  ipcMain.handle('win:reveal', async (_e, relPath, isDir) => {
+    try {
+      const abs = await getActiveFs().resolveAbsolute(relPath)
+      if (isDir) {
+        const errMsg = await shell.openPath(abs)
+        return errMsg ? { ok: false, reason: errMsg } : { ok: true }
+      }
+      shell.showItemInFolder(abs)
+      return { ok: true }
+    } catch (err) {
+      console.error('[main] reveal 失败:', err)
+      return { ok: false, reason: String(err?.message ?? err) }
     }
   })
 }
