@@ -106,6 +106,10 @@ export default function FileTree({
   const MAX_INDENT_DEPTH = 5
   const indent = 8 + Math.min(depth, MAX_INDENT_DEPTH) * 14
   const rowStyle = { paddingLeft: indent, '--indent-width': `${indent}px` }
+  // 9.4 缺陷修复：记录最近一次按下/释放是否落在行内箭头（区分递归/单层展开）。
+  // click 的 target 是 mousedown/mouseup 的共同祖先——鼠标从行拖到箭头再释放时 target 是行按钮，
+  // 箭头自身的 onClick 不会触发；故改用 pointerup 的 target（真实释放点）判定，见行按钮 onClick。
+  const pressOnArrowRef = useRef(false)
 
   // 重命名输入行（替换节点行，保持缩进）
   const renameRow = (node) => (
@@ -135,7 +139,21 @@ export default function FileTree({
                   type="button"
                   className={`filetree__row${node.expanded ? ' filetree__row--open' : ''}`}
                   style={rowStyle}
-                  onClick={() => onToggle(node)}
+                  // 9.4 缺陷修复：点击递归/单层判定。pointerup 记录释放点是否落在箭头；
+                  // click 时按记录路由——箭头=递归展开/收起，行其余=单层展开/收起。
+                  // 同时保留 onToggle 兜底：onArrowToggle 未传（防御）时箭头退化为单层。
+                  onPointerDown={(e) => {
+                    pressOnArrowRef.current = Boolean(e.target.closest('.filetree__arrow'))
+                  }}
+                  onPointerUp={(e) => {
+                    pressOnArrowRef.current = Boolean(e.target.closest('.filetree__arrow'))
+                  }}
+                  onClick={() => {
+                    const onArrow = pressOnArrowRef.current
+                    pressOnArrowRef.current = false
+                    if (onArrow) onArrowToggle?.(node)
+                    else onToggle(node)
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -149,10 +167,6 @@ export default function FileTree({
                     tabIndex={-1}
                     aria-label={node.expanded ? '收起子文件夹' : '展开子文件夹'}
                     title={node.expanded ? '递归收起子文件夹' : '递归展开子文件夹'}
-                    onClick={(e) => {
-                      e.stopPropagation() // 不触发整行单层展开
-                      onArrowToggle?.(node)
-                    }}
                   >
                     {node.expanded ? '▾' : '▸'}
                   </span>
@@ -172,6 +186,7 @@ export default function FileTree({
                         nodes={node.children}
                         editor={editor}
                         onToggle={onToggle}
+                        onArrowToggle={onArrowToggle} // 9.4 缺陷修复：漏传致嵌套层箭头递归展开无反应
                         depth={depth + 1}
                         onContextMenu={onContextMenu}
                         creating={creating}
