@@ -17,6 +17,8 @@ const api = {
   fs: {
     readFile: (relPath) => ipcRenderer.invoke('fs:read_file', relPath),
     writeFile: (relPath, content) => ipcRenderer.invoke('fs:write_file', relPath, content),
+    /** 写入原始字节（9.3.3 图片粘贴）：Uint8Array 落盘 */
+    writeFileBinary: (relPath, data) => ipcRenderer.invoke('fs:write_file_binary', relPath, data),
     listDirectory: (relPath) => ipcRenderer.invoke('fs:list_directory', relPath),
     /** 目录树聚合：一次返回目录项 + 类型（[{ name, isDirectory }]，阶段 4.1） */
     listDetail: (relPath) => ipcRenderer.invoke('fs:list_detail', relPath),

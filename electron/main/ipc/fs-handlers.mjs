@@ -18,6 +18,9 @@ export function registerFsHandlers() {
   ipcMain.handle('fs:write_file', (_e, relPath, content) =>
     getActiveFs().writeFile(relPath, content)
   )
+  ipcMain.handle('fs:write_file_binary', (_e, relPath, data) =>
+    getActiveFs().writeFileBinary(relPath, data)
+  ) // 9.3.3 图片粘贴：Uint8Array 原样写入（structured clone 透传）
   ipcMain.handle('fs:list_directory', (_e, relPath) => getActiveFs().listDirectory(relPath))
   ipcMain.handle('fs:list_detail', (_e, relPath) => getActiveFs().listDetail(relPath)) // 4.1：目录树聚合
   ipcMain.handle('fs:mkdir', (_e, relPath) => getActiveFs().mkdir(relPath))

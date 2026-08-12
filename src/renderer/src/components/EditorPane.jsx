@@ -291,6 +291,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
                 value={content}
                 onChange={setContent}
                 theme={theme}
+                baseDir={baseDir}
                 onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
                 onCursorLineChange={mode === 'split' ? handleEditorCursorLine : undefined}
               />

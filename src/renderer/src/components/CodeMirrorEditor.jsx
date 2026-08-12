@@ -13,8 +13,23 @@ import { markdown } from '@codemirror/lang-markdown'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { Compartment } from '@codemirror/state'
 
+/** 9.3.3 图片粘贴文件名时间戳：image-YYYYMMDD-HHMMSS */
+function formatTs() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+}
+
+/** 9.3.3 图片扩展名：优先文件名，其次 mime（jpeg 归一为 jpg），兜底 png */
+function extOf(mime, fileName) {
+  const fromName = fileName?.match(/\.(\w+)$/)?.[1]?.toLowerCase()
+  if (fromName) return fromName === 'jpeg' ? 'jpg' : fromName
+  const fromMime = mime?.split('/')[1]?.toLowerCase() ?? ''
+  return fromMime === 'jpeg' ? 'jpg' : fromMime || 'png'
+}
+
 const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
-  { value, onChange, theme, onTopLineChange, onCursorLineChange },
+  { value, onChange, theme, onTopLineChange, onCursorLineChange, baseDir },
   ref
 ) {
   const containerRef = useRef(null)
@@ -28,6 +43,10 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
   // 9.2.7 光标行联动：编辑/导航时上报光标所在行，供预览区跟随
   const onCursorLineChangeRef = useRef(onCursorLineChange)
   onCursorLineChangeRef.current = onCursorLineChange
+  // 9.3.3 图片粘贴资产管理：当前文件所在目录（markdown 相对路径基准）+ 粘贴处理 ref
+  const baseDirRef = useRef(baseDir)
+  baseDirRef.current = baseDir
+  const pasteHandlerRef = useRef(null)
   // programmatic 滚动抑制：外部驱动滚动期间不上报（防双向联动回环）
   const progRef = useRef(false)
   const progTimerRef = useRef(0)
@@ -71,6 +90,43 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
     []
   )
 
+  // 9.3.3 图片粘贴处理（渲染期赋值最新闭包；挂载 effect 中经 pasteHandlerRef 调用）。
+  // 剪贴板图片（浏览器截图/复制图片）或拖入的图片文件 → 存工作区 .wr/assets/ → 光标处插入 ![](相对路径)。
+  pasteHandlerRef.current = async (e) => {
+    const files = [...(e.clipboardData?.files ?? [])]
+    const images = files.filter(
+      (f) => f.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.name ?? '')
+    )
+    if (images.length === 0) return // 非图片粘贴：走编辑器默认
+    e.preventDefault()
+    const view = viewRef.current
+    if (!view) return
+    for (const img of images) {
+      try {
+        const data = new Uint8Array(await img.arrayBuffer())
+        await savePastedImage(view, data, img.type ?? '', img.name ?? '')
+      } catch (err) {
+        console.error('[editor] 粘贴图片保存失败:', err)
+      }
+    }
+  }
+
+  /** 9.3.3 保存粘贴图片到工作区 .wr/assets/（用户定案衍生目录），光标处插入 markdown 图片语法 */
+  async function savePastedImage(view, data, mime, fileName) {
+    const baseDir = baseDirRef.current ?? ''
+    const name = `image-${formatTs()}.${extOf(mime, fileName)}`
+    const assetRel = `.wr/assets/${name}`
+    await window.mework.fs.writeFileBinary(assetRel, data)
+    // markdown 引用：从当前文件目录到资产的相对路径（.wr 在根，按层级上溯 ../）
+    const rel = baseDir ? `${'../'.repeat(baseDir.split('/').length)}${assetRel}` : assetRel
+    const insert = `![](${rel})`
+    const pos = view.state.selection.main.head
+    view.dispatch({
+      changes: { from: pos, insert },
+      selection: { anchor: pos + insert.length }
+    })
+  }
+
   // 创建一次 EditorView
   useEffect(() => {
     const themeComp = new Compartment()
@@ -109,9 +165,14 @@ const CodeMirrorEditor = forwardRef(function CodeMirrorEditor(
     }
     view.scrollDOM.addEventListener('scroll', onScroll)
 
+    // 9.3.3 图片粘贴：监听 EditorView 根 DOM（拦截剪贴板图片）
+    const onPaste = (e) => pasteHandlerRef.current?.(e)
+    view.dom.addEventListener('paste', onPaste)
+
     view.focus()
     return () => {
       view.scrollDOM.removeEventListener('scroll', onScroll)
+      view.dom.removeEventListener('paste', onPaste)
       clearTimeout(progTimerRef.current)
       view.destroy()
       viewRef.current = null

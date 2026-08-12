@@ -41,6 +41,15 @@ test('writeFile 拒绝穿越写入', async () => {
   await assert.rejects(() => ops.writeFile('../evil.txt', 'x'), /穿越|symlink/)
 })
 
+test('writeFileBinary 写入原始字节（9.3.3 图片粘贴）', async () => {
+  const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]) // PNG 魔数
+  await ops.writeFileBinary('.wr/assets/img.png', data)
+  const raw = await readFile(join(root, '.wr', 'assets', 'img.png'))
+  assert.deepEqual([...raw], [...data]) // 字节原样，无文本编码转换
+  // 穿越写入拒绝（与文本写入同约束）
+  await assert.rejects(() => ops.writeFileBinary('../evil.png', data), /穿越|symlink/)
+})
+
 test('appendFile 追加写入不覆盖（8.2 日志用）', async () => {
   await ops.appendFile('logs/app.log', 'line1\n')
   await ops.appendFile('logs/app.log', 'line2\n')

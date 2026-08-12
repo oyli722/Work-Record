@@ -39,6 +39,13 @@ export function createFsOps(guard) {
       await writeFile(abs, content, 'utf-8')
     },
 
+    /** 写入文件原始字节（9.3.3 图片粘贴等）。data 为 Uint8Array/Buffer，不做文本编码。 */
+    async writeFileBinary(relPath, data) {
+      const abs = await safe(relPath)
+      await mkdir(dirname(abs), { recursive: true })
+      await writeFile(abs, data)
+    },
+
     /** 追加写入（UTF-8 文本，日志用，8.2）。文件不存在则创建。 */
     async appendFile(relPath, content) {
       const abs = await safe(relPath)
