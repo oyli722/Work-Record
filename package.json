@@ -1,6 +1,6 @@
 {
   "name": "mework",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "本地工作记录管理桌面应用（Electron + React + JS）。WorkRecord 的极简重构：砍掉 AI 与日程，保留工作区 + 文件编辑，新增标签页。",
   "main": "out/main/index.js",
   "private": true,
