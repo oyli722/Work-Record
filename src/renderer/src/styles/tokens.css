@@ -50,7 +50,8 @@
   --color-paper-text-secondary: #6e6e73;
   --color-paper-border: #e6e3de;
 
-  /* ---- 间距（4 的倍数，克制留白） ---- */
+  /* ---- 间距（4 的倍数，克制留白；9.1.2 补 --space-0 微间距） ---- */
+  --space-0: 2px; /* 细分段控件间隙 / 微 padding（tab 间隙、关闭按钮） */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -68,6 +69,14 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+
+  /* ---- 层级（9.1.2 新增 z-index token，替代散落魔法数字） ---- */
+  --z-chrome: 10; /* 顶栏 / 侧边栏（常驻 chrome） */
+  --z-menu: 30; /* 侧边栏下拉菜单 */
+  --z-focus: 100; /* 专注模式浮层 */
+  --z-panel: 150; /* 滑出面板（版本面板等） */
+  --z-context-menu: 200; /* 右键菜单 */
+  --z-dialog: 300; /* 弹窗 / 遮罩（确认、设置、新建文件） */
 
   /* ---- 字体 ---- */
   /* PRD §3.4.3：系统字体栈优先，跨平台备选 Inter / 思源黑体；阶段 6 提供三选切换 */
