@@ -88,7 +88,10 @@ export default function Sidebar({
   function onResizeMove(e) {
     const drag = resizeRef.current
     if (!drag) return
-    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, drag.startWidth + (e.clientX - drag.startX)))
+    const next = Math.min(
+      SIDEBAR_MAX,
+      Math.max(SIDEBAR_MIN, drag.startWidth + (e.clientX - drag.startX))
+    )
     setSidebarWidth(next)
   }
   function onResizeUp() {
@@ -196,7 +199,9 @@ export default function Sidebar({
   /** 展开/关闭文件夹节点（懒加载子级；关闭时释放子数据保持新鲜；不可变更新） */
   async function toggleFolder(node) {
     if (node.expanded) {
-      setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null })))
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null }))
+      )
       return
     }
     setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, loading: true })))
@@ -204,11 +209,21 @@ export default function Sidebar({
       const items = await window.mework.fs.listDetail(node.relPath)
       const children = buildNodes(items, node.relPath)
       setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, expanded: true, loading: false, children, error: null }))
+        updateNode(t, node.relPath, (n) => ({
+          ...n,
+          expanded: true,
+          loading: false,
+          children,
+          error: null
+        }))
       )
     } catch (err) {
       setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+        updateNode(t, node.relPath, (n) => ({
+          ...n,
+          loading: false,
+          error: String(err?.message ?? err)
+        }))
       )
     }
   }
@@ -217,7 +232,9 @@ export default function Sidebar({
       展开：逐层懒加载所有子文件夹；收起：目标节点整棵折叠。 */
   async function toggleFolderRecursive(node) {
     if (node.expanded) {
-      setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null })))
+      setTree((t) =>
+        updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null }))
+      )
       return
     }
     setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: true, loading: true })))
@@ -226,7 +243,11 @@ export default function Sidebar({
       setTree((t) => replaceNode(t, node.relPath, expandedNode))
     } catch (err) {
       setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+        updateNode(t, node.relPath, (n) => ({
+          ...n,
+          loading: false,
+          error: String(err?.message ?? err)
+        }))
       )
     }
   }
@@ -275,15 +296,24 @@ export default function Sidebar({
   async function startCreate(parentRelPath, type) {
     setContextMenu(null)
     setCreating(null)
-    if (parentRelPath !== '') {
+    if (parentRelPath === '') {
+      // 根级新建：确保列表展开，输入行可见（列表收起或工作区为空时同样可新建）
+      setListOpen(true)
+    } else {
       setTree((t) => updateNode(t, parentRelPath, (n) => ({ ...n, expanded: true, loading: true })))
       try {
         const items = await window.mework.fs.listDetail(parentRelPath)
         const children = buildNodes(items, parentRelPath)
-        setTree((t) => updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, children, error: null })))
+        setTree((t) =>
+          updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, children, error: null }))
+        )
       } catch (err) {
         setTree((t) =>
-          updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, error: String(err?.message ?? err) }))
+          updateNode(t, parentRelPath, (n) => ({
+            ...n,
+            loading: false,
+            error: String(err?.message ?? err)
+          }))
         )
       }
     }
@@ -403,7 +433,13 @@ export default function Sidebar({
       const items = await window.mework.fs.listDetail(parentRelPath)
       const children = buildNodes(items, parentRelPath)
       setTree((t) =>
-        updateNode(t, parentRelPath, (n) => ({ ...n, children, expanded: true, loading: false, error: null }))
+        updateNode(t, parentRelPath, (n) => ({
+          ...n,
+          children,
+          expanded: true,
+          loading: false,
+          error: null
+        }))
       )
     } catch (err) {
       setListError(String(err?.message ?? err))
@@ -464,7 +500,13 @@ export default function Sidebar({
     try {
       const children = await refreshTreeNodes(node.children ?? [], node.relPath)
       setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, children, expanded: true, loading: false, error: null }))
+        updateNode(t, node.relPath, (n) => ({
+          ...n,
+          children,
+          expanded: true,
+          loading: false,
+          error: null
+        }))
       )
     } catch (err) {
       setListError(String(err?.message ?? err))
@@ -570,52 +612,56 @@ export default function Sidebar({
           <div className="sidebar__tree-body">
             {listError && <p className="filetree__status filetree__status--error">{listError}</p>}
             {!listError && listLoading && <p className="filetree__status">加载中…</p>}
-            {!listError && !listLoading && tree && tree.length === 0 && (
+            {!listError && !listLoading && tree && tree.length === 0 && !creating && (
               <p className="filetree__status">工作区为空</p>
             )}
-            {!listError && !listLoading && tree && tree.length > 0 && (
-              <>
-                {/* 根级新建输入行（右键顶部文件夹图标触发） */}
-                {creating?.parentRelPath === '' && (
-                  <div className="filetree__create-row filetree__create-row--root">
-                    <InlineInput
-                      defaultValue={creating.type === 'folder' ? '新建文件夹' : '未命名.md'}
-                      onSubmit={submitCreate}
-                      onCancel={cancelCreate}
-                    />
-                  </div>
-                )}
-                <FileTree
-                  nodes={tree}
-                  editor={editor}
-                  onToggle={toggleFolder}
-                  onArrowToggle={toggleFolderRecursive}
-                  onContextMenu={(e, node) =>
-                    openMenu(
-                      e,
-                      node.isDir
-                        ? [
-                            { label: '新建 MD 文件', onClick: () => startCreate(node.relPath, 'file') },
-                            { label: '新建文件夹', onClick: () => startCreate(node.relPath, 'folder') },
-                            { label: '重命名', onClick: () => startRename(node) },
-                            { label: '删除', danger: true, onClick: () => startDelete(node) },
-                            { label: '刷新', onClick: () => refreshBranch(node) } // 4.5
-                          ]
-                        : [
-                            { label: '版本历史', onClick: () => openVersionPanel(node) },
-                            { label: '重命名', onClick: () => startRename(node) },
-                            { label: '删除', danger: true, onClick: () => startDelete(node) }
-                          ]
-                    )
-                  }
-                  creating={creating}
-                  onSubmitCreate={submitCreate}
-                  onCancelCreate={cancelCreate}
-                  renaming={renaming}
-                  onSubmitRename={submitRename}
-                  onCancelRename={cancelRename}
+            {/* 根级新建输入行（右键顶部文件夹图标触发）；列表收起或工作区为空时同样可见 */}
+            {creating?.parentRelPath === '' && (
+              <div className="filetree__create-row filetree__create-row--root">
+                <InlineInput
+                  defaultValue={creating.type === 'folder' ? '新建文件夹' : '未命名.md'}
+                  onSubmit={submitCreate}
+                  onCancel={cancelCreate}
                 />
-              </>
+              </div>
+            )}
+            {!listError && !listLoading && tree && tree.length > 0 && (
+              <FileTree
+                nodes={tree}
+                editor={editor}
+                onToggle={toggleFolder}
+                onArrowToggle={toggleFolderRecursive}
+                onContextMenu={(e, node) =>
+                  openMenu(
+                    e,
+                    node.isDir
+                      ? [
+                          {
+                            label: '新建 MD 文件',
+                            onClick: () => startCreate(node.relPath, 'file')
+                          },
+                          {
+                            label: '新建文件夹',
+                            onClick: () => startCreate(node.relPath, 'folder')
+                          },
+                          { label: '重命名', onClick: () => startRename(node) },
+                          { label: '删除', danger: true, onClick: () => startDelete(node) },
+                          { label: '刷新', onClick: () => refreshBranch(node) } // 4.5
+                        ]
+                      : [
+                          { label: '版本历史', onClick: () => openVersionPanel(node) },
+                          { label: '重命名', onClick: () => startRename(node) },
+                          { label: '删除', danger: true, onClick: () => startDelete(node) }
+                        ]
+                  )
+                }
+                creating={creating}
+                onSubmitCreate={submitCreate}
+                onCancelCreate={cancelCreate}
+                renaming={renaming}
+                onSubmitRename={submitRename}
+                onCancelRename={cancelRename}
+              />
             )}
           </div>
         )}
