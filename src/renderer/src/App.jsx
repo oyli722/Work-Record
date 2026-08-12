@@ -28,6 +28,11 @@ export default function App() {
     autosaveEnabled: settings.autosaveEnabled,
     autosaveDelayMs: settings.autosaveDelayMs
   })
+  // 9.2.6 全局快捷键（PRD §8.2 开放项 5）：动作注册表由 Sidebar/EditorPane 渲染期赋值，
+  // App 全局 keydown 分发（渲染期赋值保证闭包最新，同 onChangeRef 惯例）
+  const shortcutActionsRef = useRef({})
+  const editorRef = useRef(editor)
+  editorRef.current = editor
   const [focus, setFocus] = useState(false)
   // 目录树状态提升到 App（3.8 评审 P1）：专注模式主/浮层 Sidebar 共享同一份状态，
   // 避免进出专注时组件实例卸载导致树数据/展开态丢失；阶段 4 目录树演进同样需要状态外移。
@@ -119,6 +124,59 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeydown, true)
   }, [])
 
+  // 9.2.6 应用级快捷键（PRD §8.2 开放项 5）：Ctrl+S 保存（EditorPane）/ F11、Esc 专注（上方）已有。
+  // 动作经 shortcutActionsRef 分发：Ctrl+W 关闭标签 · Ctrl+Tab/Shift 切换标签 · Ctrl+\ 循环分屏模式 ·
+  // Ctrl+N 新建文件 · Ctrl+Shift+N 新建文件夹 · F2 重命名当前打开文件。
+  // 弹窗打开（设置/确认/新建文件）时不响应应用级快捷键，交弹窗自身处理。
+  useEffect(() => {
+    function onKeydown(e) {
+      if (document.querySelector('.settings__mask, .confirm-dialog__mask')) return
+      const a = shortcutActionsRef.current
+      const ed = editorRef.current
+      const mod = e.ctrlKey && !e.altKey
+      if (mod && e.key === 'Tab') {
+        e.preventDefault()
+        const tabs = ed.tabs
+        const cur = ed.activeRelPath
+        if (tabs.length < 2 || !cur) return
+        const idx = tabs.findIndex((t) => t.relPath === cur)
+        const next = e.shiftKey ? (idx - 1 + tabs.length) % tabs.length : (idx + 1) % tabs.length
+        ed.activateTab(tabs[next].relPath)
+        return
+      }
+      if (mod && !e.shiftKey && (e.key === 'w' || e.key === 'W')) {
+        e.preventDefault()
+        a.closeTab?.()
+        return
+      }
+      if (mod && !e.shiftKey && e.key === '\\') {
+        e.preventDefault()
+        a.cycleMode?.()
+        return
+      }
+      if (mod && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault()
+        a.newFolder?.()
+        return
+      }
+      if (mod && !e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault()
+        a.newFile?.()
+        return
+      }
+      if (e.key === 'F2') {
+        // 文本输入中（重命名框/设置输入等）不触发 F2 重命名
+        const ae = document.activeElement
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return
+        e.preventDefault()
+        a.renameActive?.()
+        return
+      }
+    }
+    window.addEventListener('keydown', onKeydown)
+    return () => window.removeEventListener('keydown', onKeydown)
+  }, [])
+
   const toggleFocus = useCallback(() => {
     if (!isActive) return
     setFocus((f) => !f)
@@ -147,11 +205,18 @@ export default function App() {
             listLoading={listLoading}
             setListLoading={setListLoading}
             onCompareChange={setCompare}
+            shortcutActionsRef={shortcutActionsRef}
           />
         )}
         <main className="app__main">
           {isActive ? (
-            <EditorPane editor={editor} theme={theme} onToggleFocus={toggleFocus} compare={compare} />
+            <EditorPane
+              editor={editor}
+              theme={theme}
+              onToggleFocus={toggleFocus}
+              compare={compare}
+              shortcutActionsRef={shortcutActionsRef}
+            />
           ) : isRestoring ? (
             <div className="app__status">
               <p className="app__hint">正在恢复工作区…</p>
@@ -176,6 +241,7 @@ export default function App() {
           setListError={setListError}
           listLoading={listLoading}
           setListLoading={setListLoading}
+          shortcutActionsRef={shortcutActionsRef}
         />
       )}
 

@@ -20,7 +20,7 @@ function dirOf(relPath) {
   return i === -1 ? '' : relPath.slice(0, i)
 }
 
-export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
+export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef }) {
   const { currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
@@ -42,6 +42,14 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare }) {
   const [closeQueue, setCloseQueue] = useState([])
   const [closeExternalConfirm, setCloseExternalConfirm] = useState(null) // 覆盖确认（关闭流程）
   const closeTarget = closeQueue[0] ?? null
+
+  // 9.2.6 快捷键动作注册（App 全局 keydown 分发；渲染期赋值保证闭包最新，同 onChangeRef 惯例）
+  shortcutActionsRef.current.cycleMode = () =>
+    setMode((m) => (m === 'split' ? 'edit' : m === 'edit' ? 'preview' : 'split'))
+  shortcutActionsRef.current.closeTab = () => {
+    if (!currentFile) return
+    setCloseQueue([currentFile]) // 复用 7.2 关闭流程（含未保存三选）
+  }
 
   /** 9.2.2 批量关闭入口：已保存直接关；未保存逐个入队三选 */
   function startBatchClose(relPaths) {

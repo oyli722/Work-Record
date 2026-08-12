@@ -39,7 +39,8 @@ export default function Sidebar({
   setListError,
   listLoading,
   setListLoading,
-  onCompareChange
+  onCompareChange,
+  shortcutActionsRef
 }) {
   // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
@@ -112,6 +113,24 @@ export default function Sidebar({
   const [deleteEmpty, setDeleteEmpty] = useState(true) // 删除目标是否为空文件夹（评审 S1）
   const [versionPanelFor, setVersionPanelFor] = useState(null) // 打开版本历史面板的文件（5.3）
   const [newFileModal, setNewFileModal] = useState(null) // 新建文件弹窗（9.2.8：{ relPath, name }）
+
+  // 9.2.6 快捷键动作注册（App 全局 keydown 分发；渲染期赋值保证闭包最新，同 onChangeRef 惯例）。
+  // 目标为工作区根 / 当前打开文件；新建/重命名均需工作区激活。
+  shortcutActionsRef.current.newFile = () => {
+    if (workspace.state !== 'active') return
+    startCreateFile('')
+  }
+  shortcutActionsRef.current.newFolder = () => {
+    if (workspace.state !== 'active') return
+    startCreate('', 'folder')
+  }
+  shortcutActionsRef.current.renameActive = () => {
+    const relPath = editor.currentFile
+    if (!relPath || workspace.state !== 'active') return
+    const name = relPath.slice(relPath.lastIndexOf('/') + 1)
+    setListOpen(true) // 树收起时先展开列表，保证重命名输入可见
+    startRename({ relPath, name, isDir: false })
+  }
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)
