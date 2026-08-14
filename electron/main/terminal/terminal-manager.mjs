@@ -5,7 +5,9 @@ import * as nodePty from 'node-pty'
 // 工厂 + 依赖注入（PRD §3.5）：pty 实现可注入（单测 mock），默认 node-pty。
 // 每个终端 = 一个 pty 会话；termId 由主进程生成（randomUUID），渲染进程仅持有 termId 句柄，
 // 不经渲染进程拼接路径（设计文档 §4 安全）。
-// CC-1 用默认 shell 跑通「echo 终端」双链路；CC-2 起改为 spawn claude CLI（cli-detect 探测后）。
+// 职责分离：manager 只管 pty 会话生命周期（create/write/resize/kill/killAll）；
+// spawn 的命令与参数由调用方传入（CC-2 起为 cli-detect 探测后的 claude CLI，缺省回退默认 shell）。
+// 不传 command 时退化为默认 shell，保留 CC-1「echo 终端」链路语义。
 
 /** 跨平台默认 shell（Windows 走 ComSpec/cmd，其余走 $SHELL/bash） */
 function defaultShell() {
@@ -13,13 +15,13 @@ function defaultShell() {
   return process.env.SHELL || 'bash'
 }
 
-export function createTerminalManager({ pty = nodePty, shell = defaultShell() } = {}) {
+export function createTerminalManager({ pty = nodePty } = {}) {
   const sessions = new Map() // termId -> { proc }
 
-  /** 创建终端会话：spawn shell，返回 termId */
-  function create({ cwd, cols = 80, rows = 24, onData, onExit }) {
+  /** 创建终端会话：spawn command（缺省默认 shell）+ args，返回 termId */
+  function create({ command, args = [], cwd, cols = 80, rows = 24, onData, onExit }) {
     const termId = randomUUID()
-    const proc = pty.spawn(shell, [], {
+    const proc = pty.spawn(command || defaultShell(), args, {
       name: 'xterm-256color',
       cols,
       rows,

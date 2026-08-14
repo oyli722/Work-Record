@@ -60,6 +60,8 @@ const api = {
 
   /** 终端（CC Console，设计文档 §4：term: 前缀）。termId 由主进程生成，渲染层仅持有句柄 */
   term: {
+    /** 探测 claude CLI：{ installed, path, version? }（设置页 / 右键菜单置灰判断） */
+    checkCli: () => ipcRenderer.invoke('term:check_cli'),
     create: (cwdRelPath) => ipcRenderer.invoke('term:create', cwdRelPath),
     write: (termId, data) => ipcRenderer.invoke('term:write', termId, data),
     resize: (termId, cols, rows) => ipcRenderer.invoke('term:resize', termId, cols, rows),
