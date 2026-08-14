@@ -1014,14 +1014,19 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
 
 /* ============ 终端（CC Console，设计文档 §3.3） ============ */
 
-/* xterm 容器：占满父级（CC-1 临时挂载区固定高度；CC-4 起占满主内容区） */
+/* xterm 容器：占满主内容区（设计文档 D4；CC-1 临时验证，CC-4 起正式接 Tab） */
 .terminal {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
+  overflow: hidden; /* 裁剪内部 xterm 溢出 */
+  position: relative; /* 建立包含块，约束 .xterm 定位 */
 }
 .terminal .xterm {
+  position: absolute; /* 强制填满 .terminal，杜绝溢出到侧边栏/窗口 */
+  inset: 0;
+  width: 100%;
   height: 100%;
-  padding: var(--space-1);
 }
 
 /* 浮层面板：默认移出视口，显示时滑入（不挤压主区布局） */

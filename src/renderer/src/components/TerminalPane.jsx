@@ -25,6 +25,10 @@ export default function TerminalPane({ cwdRelPath = '.', fontSize = 13 }) {
     term.open(container)
     fit.fit()
 
+    // 容器尺寸变化 → 重新 fit（终端跟随主内容区大小，避免 xterm-screen 停留在初始尺寸）
+    const fitObserver = new ResizeObserver(() => fit.fit())
+    fitObserver.observe(container)
+
     let termId = null
     let disposed = false
 
@@ -62,6 +66,7 @@ export default function TerminalPane({ cwdRelPath = '.', fontSize = 13 }) {
 
     return () => {
       disposed = true
+      fitObserver.disconnect()
       offData()
       offExit()
       dataDisposable.dispose()

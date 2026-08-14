@@ -17,6 +17,7 @@
   "build": {
     "appId": "com.mework.app",
     "productName": "MeWork",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },

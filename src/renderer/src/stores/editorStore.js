@@ -16,7 +16,8 @@ export const OPEN_TABS_KEY = 'mework.openTabs'
 export function readOpenTabs() {
   try {
     const list = JSON.parse(localStorage.getItem(OPEN_TABS_KEY) ?? '[]')
-    return Array.isArray(list) ? list : []
+    // 过滤非字符串/空元素（历史脏数据防御：避免 openFile 收到非法 relPath 导致渲染崩溃）
+    return Array.isArray(list) ? list.filter((p) => typeof p === 'string' && p.length > 0) : []
   } catch {
     return []
   }

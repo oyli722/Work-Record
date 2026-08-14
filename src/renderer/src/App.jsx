@@ -8,7 +8,6 @@ import WorkspaceEmpty from './components/WorkspaceEmpty'
 import TopBar from './components/TopBar'
 import Sidebar from './components/Sidebar'
 import EditorPane from './components/EditorPane'
-import TerminalPane from './components/TerminalPane'
 import FocusOverlay from './components/FocusOverlay'
 import SettingsModal from './components/SettingsModal'
 
@@ -111,10 +110,15 @@ export default function App() {
   activeRef.current = isActive
 
   // 专注模式快捷键（capture 确保先于 CodeMirror 消费 Esc；F11 preventDefault 防系统全屏）
+  // 焦点在终端内时 F11 让渡给终端（设计文档 D10），不触发专注
   useEffect(() => {
     function onKeydown(e) {
       if (e.key === 'F11') {
         if (!activeRef.current) return // 未激活工作区：放行 F11，不吞掉系统行为（评审 S3）
+        if (document.activeElement?.closest('.terminal, .xterm')) {
+          e.preventDefault() // 终端内：阻止全屏 + 不触发专注（D10）
+          return
+        }
         e.preventDefault()
         setFocus((f) => !f) // 仅工作区激活时可切换（用户定案）
       } else if (e.key === 'Escape' && focusRef.current) {
@@ -211,26 +215,13 @@ export default function App() {
         )}
         <main className="app__main">
           {isActive ? (
-            <>
-              <EditorPane
-                editor={editor}
-                theme={theme}
-                onToggleFocus={toggleFocus}
-                compare={compare}
-                shortcutActionsRef={shortcutActionsRef}
-              />
-              {/* CC-1 临时：echo 终端链路验证（CC-3/CC-4 起正式接入 Tab 模型后移除） */}
-              <div
-                className="cc1-terminal-test"
-                style={{
-                  height: 200,
-                  flexShrink: 0,
-                  borderTop: '1px solid var(--color-border-subtle)'
-                }}
-              >
-                <TerminalPane />
-              </div>
-            </>
+            <EditorPane
+              editor={editor}
+              theme={theme}
+              onToggleFocus={toggleFocus}
+              compare={compare}
+              shortcutActionsRef={shortcutActionsRef}
+            />
           ) : isRestoring ? (
             <div className="app__status">
               <p className="app__hint">正在恢复工作区…</p>
