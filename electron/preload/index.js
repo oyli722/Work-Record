@@ -56,6 +56,26 @@ const api = {
     reveal: (relPath, isDir) => ipcRenderer.invoke('win:reveal', relPath, isDir),
     /** 应用版本号（9.3.5）：动态读取 package.json version，关于页展示 */
     getVersion: () => ipcRenderer.invoke('win:get_app_version')
+  },
+
+  /** 终端（CC Console，设计文档 §4：term: 前缀）。termId 由主进程生成，渲染层仅持有句柄 */
+  term: {
+    create: (cwdRelPath) => ipcRenderer.invoke('term:create', cwdRelPath),
+    write: (termId, data) => ipcRenderer.invoke('term:write', termId, data),
+    resize: (termId, cols, rows) => ipcRenderer.invoke('term:resize', termId, cols, rows),
+    kill: (termId) => ipcRenderer.invoke('term:kill', termId),
+    /** 订阅终端输出；返回取消订阅函数（组件卸载时调用防泄漏） */
+    onData: (cb) => {
+      const listener = (_e, termId, chunk) => cb(termId, chunk)
+      ipcRenderer.on('term:data', listener)
+      return () => ipcRenderer.removeListener('term:data', listener)
+    },
+    /** 订阅进程退出事件 */
+    onExit: (cb) => {
+      const listener = (_e, termId, code) => cb(termId, code)
+      ipcRenderer.on('term:exit', listener)
+      return () => ipcRenderer.removeListener('term:exit', listener)
+    }
   }
 }
 

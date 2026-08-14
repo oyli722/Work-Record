@@ -1012,6 +1012,18 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   width: 8px;
 }
 
+/* ============ 终端（CC Console，设计文档 §3.3） ============ */
+
+/* xterm 容器：占满父级（CC-1 临时挂载区固定高度；CC-4 起占满主内容区） */
+.terminal {
+  height: 100%;
+  width: 100%;
+}
+.terminal .xterm {
+  height: 100%;
+  padding: var(--space-1);
+}
+
 /* 浮层面板：默认移出视口，显示时滑入（不挤压主区布局） */
 .focus__panel {
   position: absolute;

@@ -1,4 +1,4 @@
-import { defineConfig } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 // MeWork 构建配置（electron-vite）
@@ -8,6 +8,7 @@ import react from '@vitejs/plugin-react'
 //   src/renderer/    —— 渲染进程（React UI）
 export default defineConfig({
   main: {
+    plugins: [externalizeDepsPlugin()],
     build: {
       lib: {
         entry: 'electron/main/index.js'

@@ -8,6 +8,7 @@ import WorkspaceEmpty from './components/WorkspaceEmpty'
 import TopBar from './components/TopBar'
 import Sidebar from './components/Sidebar'
 import EditorPane from './components/EditorPane'
+import TerminalPane from './components/TerminalPane'
 import FocusOverlay from './components/FocusOverlay'
 import SettingsModal from './components/SettingsModal'
 
@@ -210,13 +211,26 @@ export default function App() {
         )}
         <main className="app__main">
           {isActive ? (
-            <EditorPane
-              editor={editor}
-              theme={theme}
-              onToggleFocus={toggleFocus}
-              compare={compare}
-              shortcutActionsRef={shortcutActionsRef}
-            />
+            <>
+              <EditorPane
+                editor={editor}
+                theme={theme}
+                onToggleFocus={toggleFocus}
+                compare={compare}
+                shortcutActionsRef={shortcutActionsRef}
+              />
+              {/* CC-1 临时：echo 终端链路验证（CC-3/CC-4 起正式接入 Tab 模型后移除） */}
+              <div
+                className="cc1-terminal-test"
+                style={{
+                  height: 200,
+                  flexShrink: 0,
+                  borderTop: '1px solid var(--color-border-subtle)'
+                }}
+              >
+                <TerminalPane />
+              </div>
+            </>
           ) : isRestoring ? (
             <div className="app__status">
               <p className="app__hint">正在恢复工作区…</p>

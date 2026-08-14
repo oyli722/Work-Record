@@ -5,6 +5,7 @@ import { getActiveFs } from './storage/fs-context.mjs'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 import { registerVersionHandlers } from './ipc/version-handlers.mjs'
+import { registerTermHandlers } from './ipc/term-handlers.mjs'
 import {
   registerMeworkFileScheme,
   registerMeworkFileHandler
@@ -114,6 +115,8 @@ function registerIpcHandlers() {
   registerWorkspaceHandlers()
   // 阶段 5 版本历史（PRD §4.5：快照 / 列表 / 读取）
   registerVersionHandlers()
+  // CC Console 终端（设计文档 §4：term: 前缀，node-pty + xterm）
+  registerTermHandlers()
 
   // 阶段 3.6 外链（PRD §4.4.3）：渲染进程请求用系统浏览器/默认程序打开链接。
   // 协议白名单经 src/shared/link-policy.js（用户定案 http/https/mailto/tel，评审 S3 单一来源）；
