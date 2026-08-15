@@ -3,7 +3,8 @@ import useTheme from './hooks/useTheme'
 import useEditorSettings from './hooks/useEditorSettings'
 import useFontSettings, { FONT_STACKS } from './hooks/useFontSettings'
 import useWorkspace from './stores/workspaceStore'
-import useEditor, { readOpenTabs, OPEN_TABS_KEY } from './stores/editorStore'
+import useEditor from './stores/editorStore'
+import { readOpenTabs, removeOpenTabs } from './stores/openTabsStorage'
 import WorkspaceEmpty from './components/WorkspaceEmpty'
 import TopBar from './components/TopBar'
 import Sidebar from './components/Sidebar'
@@ -95,14 +96,8 @@ export default function App() {
           }
           const r = await editor.openFile(item.relPath)
           if (!r.ok) {
-            try {
-              localStorage.setItem(
-                OPEN_TABS_KEY,
-                JSON.stringify(readOpenTabs().filter((it) => !(it.type === 'file' && it.relPath === item.relPath)))
-              )
-            } catch {
-              /* 静默 */
-            }
+            // 恢复失败（文件被删）：剔除持久化路径（评审 S3），下次启动不再尝试
+            removeOpenTabs((it) => it.type === 'file' && it.relPath === item.relPath)
           }
         }
       })()

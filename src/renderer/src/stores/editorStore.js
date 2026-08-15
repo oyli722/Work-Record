@@ -10,41 +10,10 @@
 // 外部改动检测（4.5）：每标签磁盘快照比对，磁盘被外部修改时保存被阻止并提示（§4.3.6）。
 
 import { useCallback, useRef, useState } from 'react'
+import { addOpenTab, clearOpenTabs, removeOpenTabs, updateOpenTabs } from './openTabsStorage'
 
 // 自动保存防抖间隔默认 30s（由 useEditorSettings 传入，3.9）
 const DEFAULT_DELAY = 30000
-
-// 7.4 打开标签列表持久化（PRD §4.7.3：应用重启恢复）
-// CC-3 格式迁移：string[]（relPath）→ object[]（{ type:'file', relPath } | { type:'terminal', cwdRelPath, title }）
-export const OPEN_TABS_KEY = 'mework.openTabs'
-
-/** 读取并迁移持久化的打开标签列表（供 App 启动恢复）：
-    旧格式 string 元素视为 file 条目（设计 §3.1 兼容迁移）；object 按 type 归类；非法项过滤。 */
-export function readOpenTabs() {
-  try {
-    const list = JSON.parse(localStorage.getItem(OPEN_TABS_KEY) ?? '[]')
-    if (!Array.isArray(list)) return []
-    return list
-      .map((item) => {
-        if (typeof item === 'string') {
-          return item.length > 0 ? { type: 'file', relPath: item } : null
-        }
-        if (item && typeof item === 'object') {
-          if (item.type === 'terminal') {
-            const cwdRelPath = typeof item.cwdRelPath === 'string' ? item.cwdRelPath : '.'
-            const title = typeof item.title === 'string' && item.title ? item.title : '终端'
-            return { type: 'terminal', cwdRelPath, title }
-          }
-          const relPath = typeof item.relPath === 'string' ? item.relPath : ''
-          return relPath ? { type: 'file', relPath } : null
-        }
-        return null
-      })
-      .filter(Boolean)
-  } catch {
-    return []
-  }
-}
 
 /** 占位终端 tab 的 key 自增（termId 为 null 时无真实 termId，需保证 key 唯一） */
 let restoreSeq = 0
@@ -70,6 +39,21 @@ function createTab(relPath, content) {
 function createTerminalTab({ termId, cwdRelPath, title, exited = false, exitCode = null }) {
   const key = termId ? `terminal:${termId}` : `terminal:restore:${++restoreSeq}`
   return { type: 'terminal', key, termId: termId ?? null, cwdRelPath, title, exited, exitCode }
+}
+
+/** 由活动标签派生 file 语义状态（UI 直接消费；terminal 标签下恒为 file 空值）。
+    纯函数，供 useEditor 返回体与未来单测共用。 */
+export function deriveFileState(activeTab) {
+  const isFile = activeTab?.type === 'file'
+  return {
+    currentFile: isFile ? activeTab.relPath : null,
+    content: isFile ? activeTab.content : '',
+    saveState: isFile ? activeTab.saveState : 'saved',
+    dirty: isFile && activeTab.saveState === 'dirty',
+    error: isFile ? activeTab.error : null,
+    loading: isFile ? activeTab.loading : false,
+    externalChange: isFile ? activeTab.externalChange : false
+  }
 }
 
 export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DEFAULT_DELAY } = {}) {
@@ -189,15 +173,8 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
       if (!tabsRef.current.some((t) => t.type === 'file' && t.relPath === relPath)) {
         return { ok: true }
       }
-      // 7.4 持久化打开列表（新标签，object 格式）
-      try {
-        const list = readOpenTabs()
-        if (!list.some((it) => it.type === 'file' && it.relPath === relPath)) {
-          localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...list, { type: 'file', relPath }]))
-        }
-      } catch {
-        /* 静默 */
-      }
+      // 7.4 持久化打开列表（新标签；addOpenTab 内部按 relPath 去重）
+      addOpenTab({ type: 'file', relPath })
       return { ok: true }
     } catch (err) {
       const msg = String(err?.message ?? err)
@@ -215,15 +192,8 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     setTabs((ts) => [...ts, tab])
     activeRef.current = tab.key
     setActiveKey(tab.key)
-    try {
-      const list = readOpenTabs()
-      // P2-4：同一目录重复开终端不重复入持久化列表（否则重启恢复出多个占位 tab）
-      if (!list.some((it) => it.type === 'terminal' && it.cwdRelPath === cwdRelPath && it.title === title)) {
-        localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...list, { type: 'terminal', cwdRelPath, title }]))
-      }
-    } catch {
-      /* 静默 */
-    }
+    // 7.4 持久化打开列表（addOpenTab 内部按 cwd+title 去重，P2-4）
+    addOpenTab({ type: 'terminal', cwdRelPath, title })
     return { ok: true, termId: r.termId, key: tab.key }
   }, [])
 
@@ -276,23 +246,12 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
         window.mework.term.kill(closing.termId).catch(() => {})
       }
       clearAutosave(closing?.relPath) // file 才可能计时；terminal 无计时，无害
-      // 7.4 持久化移除关闭的标签（object 格式）
-      try {
-        const list = readOpenTabs()
-        localStorage.setItem(
-          OPEN_TABS_KEY,
-          JSON.stringify(
-            list.filter((it) => {
-              if (closing?.type === 'terminal') {
-                return !(it.type === 'terminal' && it.cwdRelPath === closing.cwdRelPath && it.title === closing.title)
-              }
-              return !(it.type === 'file' && it.relPath === closing?.relPath)
-            })
-          )
-        )
-      } catch {
-        /* 静默 */
-      }
+      // 7.4 持久化移除关闭的标签（file 按 relPath、terminal 按 cwd+title 匹配）
+      removeOpenTabs((it) =>
+        closing?.type === 'terminal'
+          ? it.type === 'terminal' && it.cwdRelPath === closing.cwdRelPath && it.title === closing.title
+          : it.type === 'file' && it.relPath === closing?.relPath
+      )
       setTabs((ts) => {
         const idx = ts.findIndex((t) => t.key === key)
         const next = ts.filter((t) => t.key !== key)
@@ -307,19 +266,23 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     [clearAutosave]
   )
 
-  /** 编辑活动 file 标签内容：更新内容与脏标记；有未保存内容时启动/重置自动保存计时 */
+  /** 编辑活动 file 标签内容：更新内容与脏标记；有未保存内容时启动/重置自动保存计时。
+      P2-1：计时器调度在 setState updater 之外（updater 必须纯函数；StrictMode 下 updater
+      双调用不再重复调度计时器）；脏标记以 updater 内最新 savedContent 判定。 */
   const setContent = useCallback(
     (text) => {
       const key = activeRef.current
       const tab = tabsRef.current.find((t) => t.key === key)
       if (!tab || tab.type !== 'file') return
       const relPath = tab.relPath
-      updateTab(key, (t) => {
-        const dirty = text !== t.savedContent
-        if (dirty) scheduleAutosave(relPath)
-        else clearAutosave(relPath)
-        return { ...t, content: text, saveState: dirty ? 'dirty' : 'saved' }
-      })
+      const dirty = text !== tab.savedContent // 快照判定（调度依据；与 updater 内判定仅差极小异步窗口）
+      if (dirty) scheduleAutosave(relPath)
+      else clearAutosave(relPath)
+      updateTab(key, (t) => ({
+        ...t,
+        content: text,
+        saveState: text !== t.savedContent ? 'dirty' : 'saved'
+      }))
     },
     [scheduleAutosave, clearAutosave]
   )
@@ -404,19 +367,8 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
       activeRef.current = newRelPath
       setActiveKey(newRelPath)
     }
-    try {
-      const list = readOpenTabs()
-      if (list.some((it) => it.type === 'file' && it.relPath === oldRelPath)) {
-        localStorage.setItem(
-          OPEN_TABS_KEY,
-          JSON.stringify(
-            list.map((it) => (it.type === 'file' && it.relPath === oldRelPath ? { ...it, relPath: newRelPath } : it))
-          )
-        )
-      }
-    } catch {
-      /* 静默 */
-    }
+    // 7.4 持久化同步重命名（评审 O2：旧路径 → 新路径）
+    updateOpenTabs((it) => it.type === 'file' && it.relPath === oldRelPath, (it) => ({ ...it, relPath: newRelPath }))
   }, [])
 
   /** 删除路径后关闭受影响标签（4.4，CC-7 扩展）：
@@ -458,30 +410,21 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     for (const t of tabsRef.current) {
       if (t.type === 'terminal' && t.termId) window.mework.term.kill(t.termId).catch(() => {})
     }
-    try {
-      localStorage.setItem(OPEN_TABS_KEY, '[]')
-    } catch {
-      /* 静默 */
-    }
+    clearOpenTabs() // 7.4 清空持久化打开列表
     setTabs([])
     activeRef.current = null
     setActiveKey(null)
   }, [])
 
-  // 活动标签派生状态（UI 直接消费）
+  // 活动标签派生状态（UI 直接消费；file 语义空值由 deriveFileState 统一，terminal 下恒为空）
   const activeTab = tabs.find((t) => t.key === activeKey) ?? null
+  const fileState = deriveFileState(activeTab)
 
   return {
     tabs,
     activeKey,
     activeTab,
-    currentFile: activeTab?.type === 'file' ? activeTab.relPath : null,
-    content: activeTab?.type === 'file' ? activeTab.content : '',
-    saveState: activeTab?.type === 'file' ? activeTab.saveState : 'saved',
-    dirty: activeTab?.type === 'file' && activeTab.saveState === 'dirty',
-    error: activeTab?.type === 'file' ? activeTab.error : null,
-    loading: activeTab?.type === 'file' ? activeTab.loading : false,
-    externalChange: activeTab?.type === 'file' ? activeTab.externalChange : false,
+    ...fileState,
     openFile,
     openTerminalTab,
     restoreTerminalTab,
