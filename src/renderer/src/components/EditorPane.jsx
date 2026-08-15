@@ -10,7 +10,7 @@ import ConfirmDialog from './ConfirmDialog'
 import DiffView from './DiffView'
 import TabBar from './TabBar'
 import TerminalPane from './TerminalPane'
-import { ExpandIcon } from './icons'
+import { FileToolbar, TerminalToolbar } from './EditorToolbar'
 import { dirOf, fileNameOf } from '../utils/path'
 import { isMarkdownFile } from '../../../shared/format-registry'
 import { registerAction, unregisterAction } from '../stores/actionRegistry'
@@ -226,17 +226,6 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
     window.removeEventListener('mouseup', onDividerUp)
   }
 
-  const modeBtn = (m, label) => (
-    <button
-      type="button"
-      className={`editor__mode${mode === m ? ' editor__mode--active' : ''}`}
-      onClick={() => setMode(m)}
-      title={`${label}模式`}
-    >
-      {label}
-    </button>
-  )
-
   return (
     <div className="editor">
       {compare ? (
@@ -256,69 +245,24 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
             onBatchClose={startBatchClose}
           />
 
-          {/* 活动工具条：terminal 隐藏三态按钮 + 保存区（D4），保留标题 + 专注入口；file 保持现状 */}
+          {/* 活动工具条（OPT-3c 拆小组件）：terminal 隐藏三态按钮 + 保存区（D4），file 保持现状 */}
           {isTerminal ? (
-            <div className="editor__bar">
-              <span className="editor__file" title={`${activeTab.title}（${activeTab.cwdRelPath}）`}>
-                {activeTab.title} — 终端
-              </span>
-              <button
-                type="button"
-                className="editor__focus"
-                onClick={onToggleFocus}
-                title="专注模式 (F11)"
-                aria-label="专注模式"
-              >
-                <ExpandIcon width={16} height={16} />
-              </button>
-            </div>
+            <TerminalToolbar
+              title={activeTab.title}
+              cwdRelPath={activeTab.cwdRelPath}
+              onToggleFocus={onToggleFocus}
+            />
           ) : (
-            <div className="editor__bar">
-              <span className="editor__file" title={currentFile}>
-                {currentFile}
-              </span>
-              <div className="editor__modes" role="group" aria-label="编辑器模式">
-                {modeBtn('split', '分屏')}
-                {modeBtn('edit', '编辑')}
-                {modeBtn('preview', '预览')}
-              </div>
-              {/* 3.8 专注模式入口：分屏切换旁（focus 时 editor__bar 整体隐藏） */}
-              <button
-                type="button"
-                className="editor__focus"
-                onClick={onToggleFocus}
-                title="专注模式 (F11)"
-                aria-label="专注模式"
-              >
-                <ExpandIcon width={16} height={16} />
-              </button>
-              <span
-                className={`editor__status${dirty ? ' editor__status--dirty' : ''}${
-                  externalChange ? ' editor__status--conflict' : ''
-                }`}
-                title={
-                  externalChange
-                    ? '磁盘文件已被外部修改，保存被阻止；Ctrl+S 或保存按钮可确认覆盖'
-                    : undefined
-                }
-              >
-                {saveState === 'saving'
-                  ? '保存中…'
-                  : externalChange
-                    ? '磁盘已变更·保存被阻止'
-                    : dirty
-                      ? '未保存'
-                      : '已保存'}
-              </span>
-              <button
-                type="button"
-                className="editor__save"
-                onClick={handleSave}
-                disabled={saveState === 'saving' || !dirty}
-              >
-                保存
-              </button>
-            </div>
+            <FileToolbar
+              currentFile={currentFile}
+              dirty={dirty}
+              saveState={saveState}
+              externalChange={externalChange}
+              onSave={handleSave}
+              onToggleFocus={onToggleFocus}
+              mode={mode}
+              onModeChange={setMode}
+            />
           )}
 
           {/* 内容区 grid 层叠（CC-3 根治：终端 cell 尺寸恒常、xterm 渲染服务不失效，
