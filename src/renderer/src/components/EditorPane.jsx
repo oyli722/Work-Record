@@ -370,7 +370,12 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
                 className="editor__content-cell"
                 style={{ visibility: tab.key === activeKey ? 'visible' : 'hidden' }}
               >
-                <TerminalPane termId={tab.termId} title={tab.title} cwdRelPath={tab.cwdRelPath} />
+                <TerminalPane
+                  termId={tab.termId}
+                  title={tab.title}
+                  cwdRelPath={tab.cwdRelPath}
+                  active={tab.key === activeKey}
+                />
               </div>
             ))}
           </div>

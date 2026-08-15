@@ -1058,6 +1058,13 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   width: 100%;
   height: 100%;
 }
+/* CC-3 缺陷二修复：组合输入（IME）时 xterm 把 textarea 定位到光标处且宽度=组合文字宽，
+   光标靠右 + 组合文字长 → textarea 超出 viewport 右缘。viewport 因 overflow-y:scroll
+   使 overflow-x 计算为 auto，聚焦的 textarea 触发浏览器 scrollIntoView → viewport 横向滚动
+   → 整个终端左移 + 右侧留白（留白随未上屏文字长度变长）。禁止横向滚动即根治（xterm 无横向滚动需求）。 */
+.terminal .xterm-viewport {
+  overflow-x: hidden;
+}
 /* CC-3 占位态：重启恢复的终端 Tab（进程已随上次退出关闭；重开按钮 CC-4 落地） */
 .terminal--placeholder {
   display: flex;
