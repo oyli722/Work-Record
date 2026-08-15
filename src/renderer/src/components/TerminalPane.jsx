@@ -84,13 +84,20 @@ function LiveTerminal({ termId, fontSize, active }) {
     }
   }, [termId, fontSize])
 
-  // 激活变化（切回/首次激活）：容器从 display:none 恢复尺寸，双重 rAF 待布局稳定后 refit
+  // 激活变化（切回）：容器从 display:none 恢复实际尺寸后 refit。
+  // 多重时序兜底（display 恢复 → 布局稳定 → 渲染服务/字符测量就绪）：
+  // 单次 fit 若在过渡态执行会拿到偏小的容器宽度，导致 cols 偏小、内容左移 + 右侧空白。
   useEffect(() => {
     if (!active) return
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => fitRef.current?.fit())
-    })
-    return () => cancelAnimationFrame(raf)
+    const timers = [0, 60, 250].map((t) =>
+      setTimeout(() => {
+        // 容器已有实际尺寸时才 fit（避免在 0 尺寸过渡态误算）
+        if (containerRef.current?.clientWidth > 0 && containerRef.current?.clientHeight > 0) {
+          fitRef.current?.fit()
+        }
+      }, t)
+    )
+    return () => timers.forEach((t) => clearTimeout(t))
   }, [active])
 
   return <div className="terminal" ref={containerRef} />
