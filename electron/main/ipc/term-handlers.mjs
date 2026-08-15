@@ -12,6 +12,11 @@ import { createCliDetect } from '../terminal/cli-detect.mjs'
 const manager = createTerminalManager()
 const cli = createCliDetect()
 
+/** 应用退出统一清理（D11）：before-quit 时 kill 全部 pty 会话（不提示），供主进程入口调用 */
+export function killAllTerminals() {
+  manager.killAll()
+}
+
 export function registerTermHandlers() {
   // 探测 claude CLI（设置页开关状态 / 右键菜单置灰判断）
   ipcMain.handle('term:check_cli', async () => {

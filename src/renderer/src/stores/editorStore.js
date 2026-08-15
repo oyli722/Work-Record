@@ -404,11 +404,22 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     }
   }, [])
 
-  /** 删除后若打开 file 标签受影响则关闭（4.4）；terminal 不受文件删除影响 */
+  /** 删除路径后关闭受影响标签（4.4，CC-7 扩展）：
+      file：删除该文件或该目录下文件 → 关闭；terminal：cwd 在被删目录内（或其下）→ 关闭并 kill 进程（§3.5） */
   const closeIfPathDeleted = useCallback((deletedRelPath) => {
+    const isInside = (relPath) =>
+      relPath === deletedRelPath || relPath.startsWith(`${deletedRelPath}/`)
+    // 先 kill 受影响终端进程（进程生命周期 = Tab 生命周期，D7）
+    for (const t of tabsRef.current) {
+      if (t.type === 'terminal' && t.termId && isInside(t.cwdRelPath)) {
+        window.mework.term.kill(t.termId).catch(() => {})
+      }
+    }
     setTabs((ts) => {
       const next = ts.filter(
-        (t) => !(t.type === 'file' && (t.relPath === deletedRelPath || t.relPath.startsWith(`${deletedRelPath}/`)))
+        (t) =>
+          !(t.type === 'file' && isInside(t.relPath)) &&
+          !(t.type === 'terminal' && isInside(t.cwdRelPath))
       )
       if (next.length !== ts.length) {
         if (next.length === 0) {

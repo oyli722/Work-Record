@@ -5,7 +5,7 @@ import { getActiveFs } from './storage/fs-context.mjs'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
 import { registerVersionHandlers } from './ipc/version-handlers.mjs'
-import { registerTermHandlers } from './ipc/term-handlers.mjs'
+import { registerTermHandlers, killAllTerminals } from './ipc/term-handlers.mjs'
 import {
   registerMeworkFileScheme,
   registerMeworkFileHandler
@@ -98,6 +98,11 @@ app.whenReady().then(() => {
 // 全平台：关闭所有窗口即退出（Windows / Linux 行为）
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// CC Console（D11）：应用退出统一清理运行中的终端会话（不提示、直接 kill，与关闭终端 Tab 无二次确认一致）
+app.on('before-quit', () => {
+  killAllTerminals()
 })
 
 /** 注册 IPC handler（PRD §3.1.2：通道前缀规范 fs: / win: / editor:） */
