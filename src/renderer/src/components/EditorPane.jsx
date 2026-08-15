@@ -45,17 +45,18 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
   const bodyRef = useRef(null)
   const dragRef = useRef(null) // { startX, startRatio }
 
-  // 4.5 外部改动覆盖确认：保存检测到磁盘被外部修改时弹确认（PRD §4.3.6）
-  const [externalConfirm, setExternalConfirm] = useState(false)
+  // 4.5 外部改动覆盖确认（OPT-4-1：统一状态机，合并原 externalConfirm / closeExternalConfirm 两套）：
+  // 保存检测到磁盘被外部修改时弹确认；关闭流程「保存」遇外部改动同样走此确认。
+  // 形态：{ mode: 'save' } | { mode: 'close', key }（close 确认后强制覆盖并继续关闭标签）
+  const [overwriteConfirm, setOverwriteConfirm] = useState(null)
   const handleSave = useCallback(async () => {
     const r = await save()
-    if (r?.externalChange) setExternalConfirm(true)
+    if (r?.externalChange) setOverwriteConfirm({ mode: 'save' })
   }, [save])
 
   // 7.2/7.3 关闭未保存标签：三选 保存/放弃/取消；「保存」遇外部改动（7.3）→ 覆盖确认后再关。
   // 9.2.2 批量关闭：closeQueue 为未保存标签队列，逐个弹三选（用户定案）；取消则中止批量。
   const [closeQueue, setCloseQueue] = useState([])
-  const [closeExternalConfirm, setCloseExternalConfirm] = useState(null) // 覆盖确认（关闭流程）
   const closeTarget = closeQueue[0] ?? null
 
   // 9.2.6 快捷键动作注册（OPT-3b：actionRegistry；useEffect 无依赖数组 → 每次渲染重注册持最新闭包）
@@ -92,7 +93,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
       editor.confirmCloseTab(key)
       setCloseQueue((q) => q.filter((x) => x !== key))
     } else if (r.externalChange) {
-      setCloseExternalConfirm(key) // 覆盖确认期间队列保持，不弹下一个
+      setOverwriteConfirm({ mode: 'close', key }) // 覆盖确认期间队列保持，不弹下一个
     } else {
       setCloseQueue([]) // 保存失败：中止批量，保留现场
     }
@@ -102,14 +103,19 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
     editor.confirmCloseTab(key) // 放弃：丢弃未保存内容，无需写盘检测
     setCloseQueue((q) => q.filter((x) => x !== key))
   }
-  async function handleCloseOverwrite() {
-    const key = closeExternalConfirm
-    setCloseExternalConfirm(null)
-    editor.activateTab(key)
-    const r = await save(true) // 用户确认覆盖外部改动（PRD §4.3.6）
-    if (r.ok) {
-      editor.confirmCloseTab(key)
-      setCloseQueue((q) => q.filter((x) => x !== key))
+  /** 统一覆盖确认回调（OPT-4-1）：save 流程直接强制覆盖；close 流程覆盖后继续关闭标签 */
+  async function handleOverwriteConfirm() {
+    const target = overwriteConfirm
+    setOverwriteConfirm(null)
+    if (target.mode === 'close') {
+      editor.activateTab(target.key)
+      const r = await save(true) // 用户确认覆盖外部改动（PRD §4.3.6）
+      if (r.ok) {
+        editor.confirmCloseTab(target.key)
+        setCloseQueue((q) => q.filter((x) => x !== target.key))
+      }
+    } else {
+      await save(true) // 用户已确认：强制覆盖（跳过检测）
     }
   }
 
@@ -346,16 +352,20 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
 
       {error && <p className="editor__error">{error}</p>}
 
-      {/* 7.3 关闭流程覆盖确认（磁盘被外部修改时，确认后强制保存并关闭） */}
-      {closeExternalConfirm && (
+      {/* 4.5/7.3 外部改动覆盖确认（OPT-4-1 统一状态机：save / close 两流程共用） */}
+      {overwriteConfirm && (
         <ConfirmDialog
           title="保存覆盖提示"
           message="磁盘中的文件已被外部修改。"
-          warning="保存将覆盖外部改动并关闭标签，是否继续？"
+          warning={
+            overwriteConfirm.mode === 'close'
+              ? '保存将覆盖外部改动并关闭标签，是否继续？'
+              : '保存将覆盖外部改动，是否继续？'
+          }
           confirmLabel="覆盖保存"
           confirmDanger={false}
-          onConfirm={handleCloseOverwrite}
-          onCancel={() => setCloseExternalConfirm(null)}
+          onConfirm={handleOverwriteConfirm}
+          onCancel={() => setOverwriteConfirm(null)}
         />
       )}
 
@@ -372,21 +382,6 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, font
           onConfirm={handleCloseSave}
           onAlt={handleCloseDiscard}
           onCancel={() => setCloseQueue([])} // 取消：中止批量，保留未保存标签
-        />
-      )}
-
-      {/* 4.5 外部改动覆盖确认（PRD §4.3.6） */}
-      {externalConfirm && (
-        <ConfirmDialog
-          title="保存覆盖提示"
-          message="磁盘中的文件已被外部修改。"
-          warning="保存将覆盖外部改动，是否继续？"
-          confirmLabel="覆盖保存"
-          onConfirm={async () => {
-            setExternalConfirm(false)
-            await save(true) // 用户已确认：强制覆盖（跳过检测）
-          }}
-          onCancel={() => setExternalConfirm(false)}
         />
       )}
     </div>
