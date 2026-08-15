@@ -10,7 +10,7 @@ const GROUPS = [
   { id: 'appearance', label: '外观' },
   { id: 'editor', label: '编辑器' },
   { id: 'workspace', label: '工作区' },
-  { id: 'ai', label: 'AI' },
+  { id: 'ai', label: 'AI 工具集成' }, // CC-5：分组文案调整（§3.8）
   { id: 'about', label: '关于' }
 ]
 
@@ -23,6 +23,7 @@ export default function SettingsModal({
   setAutosaveEnabled,
   setAutosaveDelayMs,
   setFontSize,
+  setTerminalMenuEnabled,
   workspace,
   editor,
   onClose
@@ -33,6 +34,24 @@ export default function SettingsModal({
   useEffect(() => {
     window.mework?.win?.getVersion?.().then(setAppVersion).catch(() => {})
   }, [])
+
+  // CC-5 CLI 检测状态（设计 §3.5）：设置页 AI 组展示 claude 是否可用；进入 AI 组时探测
+  const [cliInfo, setCliInfo] = useState(null) // { installed, path, version? } | null（未探测）
+  useEffect(() => {
+    if (group !== 'ai') return
+    let cancelled = false
+    window.mework.term
+      .checkCli()
+      .then((info) => {
+        if (!cancelled) setCliInfo(info)
+      })
+      .catch(() => {
+        if (!cancelled) setCliInfo({ installed: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [group])
 
   const radio = (name, value, current, onChange, label) => (
     <label key={value} className="settings__radio">
@@ -87,11 +106,8 @@ export default function SettingsModal({
               <button
                 key={g.id}
                 type="button"
-                className={`settings__nav-item${group === g.id ? ' settings__nav-item--active' : ''}${
-                  g.id === 'ai' ? ' settings__nav-item--disabled' : ''
-                }`}
+                className={`settings__nav-item${group === g.id ? ' settings__nav-item--active' : ''}`}
                 onClick={() => setGroup(g.id)}
-                title={g.id === 'ai' ? '将在未来版本中提供' : undefined}
               >
                 {g.label}
               </button>
@@ -161,7 +177,33 @@ export default function SettingsModal({
               </>
             )}
             {group === 'ai' && (
-              <p className="settings__disabled">AI 功能将在未来版本中提供。</p>
+              <>
+                {/* CC-5：AI 分组首个真实功能落点（§3.8）——终端入口开关 + CLI 检测状态 */}
+                <h4 className="settings__h4">Claude Code 终端</h4>
+                <label className="settings__toggle">
+                  <input
+                    type="checkbox"
+                    checked={editorSettings.terminalMenuEnabled}
+                    onChange={(e) => setTerminalMenuEnabled(e.target.checked)}
+                  />
+                  <span>右键打开 Claude Code 终端</span>
+                </label>
+                <p className="settings__hint">
+                  开启后，目录树文件夹右键菜单新增「在此打开 Claude Code 终端」。
+                </p>
+                <h4 className="settings__h4">CLI 检测</h4>
+                {cliInfo === null ? (
+                  <p className="settings__path">检测中…</p>
+                ) : cliInfo.installed ? (
+                  <p className="settings__path" title={cliInfo.path}>
+                    ✅ 已检测到 Claude Code{cliInfo.version ? `（v${cliInfo.version}）` : ''}
+                  </p>
+                ) : (
+                  <p className="settings__path">⚠ 未检测到 Claude Code CLI（终端入口将置灰）</p>
+                )}
+                <h4 className="settings__h4">其余 AI 能力</h4>
+                <p className="settings__disabled">将在未来版本中提供。</p>
+              </>
             )}
             {group === 'about' && (
               <>

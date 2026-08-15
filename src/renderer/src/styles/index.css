@@ -1569,6 +1569,11 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   word-break: break-all;
   margin: var(--space-1) 0 var(--space-3);
 }
+.settings__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  margin: var(--space-1) 0 var(--space-3);
+}
 .settings__disabled {
   color: var(--color-text-tertiary);
   font-size: var(--font-size-sm);

@@ -20,7 +20,8 @@ import SettingsModal from './components/SettingsModal'
 export default function App() {
   const { theme, mode, cycleTheme, setThemeMode } = useTheme()
   const { font, setFontMode } = useFontSettings() // 6.2 字体切换（仅 UI 字体）
-  const { settings, setAutosaveEnabled, setAutosaveDelayMs, setFontSize } = useEditorSettings()
+  const { settings, setAutosaveEnabled, setAutosaveDelayMs, setFontSize, setTerminalMenuEnabled } =
+    useEditorSettings()
   const [settingsOpen, setSettingsOpen] = useState(false) // 8.1 设置弹窗
   const workspace = useWorkspace()
   // 3.9：编辑器设置驱动 editorStore 自动保存；只传必要参数减少耦合（评审 O1），字号经 CSS 变量单独应用
@@ -216,6 +217,7 @@ export default function App() {
             setListLoading={setListLoading}
             onCompareChange={setCompare}
             shortcutActionsRef={shortcutActionsRef}
+            terminalMenuEnabled={settings.terminalMenuEnabled}
           />
         )}
         <main className="app__main">
@@ -253,6 +255,7 @@ export default function App() {
           listLoading={listLoading}
           setListLoading={setListLoading}
           shortcutActionsRef={shortcutActionsRef}
+          terminalMenuEnabled={settings.terminalMenuEnabled}
         />
       )}
 
@@ -267,6 +270,7 @@ export default function App() {
           setAutosaveEnabled={setAutosaveEnabled}
           setAutosaveDelayMs={setAutosaveDelayMs}
           setFontSize={setFontSize}
+          setTerminalMenuEnabled={setTerminalMenuEnabled}
           workspace={workspace}
           editor={editor}
           onClose={() => setSettingsOpen(false)}

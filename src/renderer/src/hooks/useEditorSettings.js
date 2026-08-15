@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-// 编辑器设置数据层（阶段 3.9，PRD §4.8.4 / §2.8）
-// 设置项：自动保存开关、防抖间隔（默认 30s，v1.3 定案）、编辑器字号。
+// 编辑器设置数据层（阶段 3.9，PRD §4.8.4 / §2.8；CC-5 加 AI 组终端入口开关，设计 §3.8）
+// 设置项：自动保存开关、防抖间隔（默认 30s，v1.3 定案）、编辑器字号；
+// CC-5：terminalMenuEnabled「右键打开 Claude Code 终端」开关（默认关，D1）。
 // 持久化于 localStorage（UI 偏好走渲染进程 localStorage，PRD §2.8），仿 useTheme 模式：
 // 读取带默认值 + 非法值回退，写入 try/catch 静默降级（localStorage 不可用时会话内生效）。
 // 设置页 UI 在阶段 8 呈现；本阶段数据层生效（字号应用到编辑区、开关/间隔驱动自动保存）。
@@ -10,7 +11,8 @@ const STORAGE_KEY = 'mework.editorSettings'
 const DEFAULT_SETTINGS = {
   autosaveEnabled: true,
   autosaveDelayMs: 30000,
-  fontSize: 14
+  fontSize: 14,
+  terminalMenuEnabled: false
 }
 const FONT_MIN = 12
 const FONT_MAX = 20
@@ -30,6 +32,7 @@ function sanitize(value) {
     if (Number.isFinite(size)) {
       v.fontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(size)))
     }
+    if (typeof value.terminalMenuEnabled === 'boolean') v.terminalMenuEnabled = value.terminalMenuEnabled
   }
   return v
 }
@@ -78,5 +81,10 @@ export default function useEditorSettings() {
     })
   }, [])
 
-  return { settings, setAutosaveEnabled, setAutosaveDelayMs, setFontSize }
+  // CC-5 终端右键入口开关（设计 D1，默认关）
+  const setTerminalMenuEnabled = useCallback((enabled) => {
+    setSettings((s) => ({ ...s, terminalMenuEnabled: Boolean(enabled) }))
+  }, [])
+
+  return { settings, setAutosaveEnabled, setAutosaveDelayMs, setFontSize, setTerminalMenuEnabled }
 }

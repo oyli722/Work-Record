@@ -65,6 +65,7 @@ export default function ContextMenu({ x, y, items, onClose }) {
             item.disabled ? ' context-menu__item--disabled' : ''
           }`}
           disabled={item.disabled}
+          title={item.title}
           onClick={() => {
             item.onClick?.()
             onClose()

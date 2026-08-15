@@ -40,11 +40,29 @@ export default function Sidebar({
   listLoading,
   setListLoading,
   onCompareChange,
-  shortcutActionsRef
+  shortcutActionsRef,
+  terminalMenuEnabled
 }) {
   // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
   // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // CC-5 CLI 检测（设计 §3.5）：挂载探测一次并缓存；未安装 → 终端右键项置灰 + tooltip
+  const [cliInfo, setCliInfo] = useState(null) // { installed, path, version? } | null（探测中/未探测）
+  useEffect(() => {
+    let cancelled = false
+    window.mework.term
+      .checkCli()
+      .then((info) => {
+        if (!cancelled) setCliInfo(info)
+      })
+      .catch(() => {
+        if (!cancelled) setCliInfo({ installed: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 9.2.1：菜单打开时点击外部 / Esc 关闭（右键弹菜单后需点击外部收起）
   useEffect(() => {
@@ -442,6 +460,24 @@ export default function Sidebar({
     }
   }
 
+  /** CC-5 终端右键菜单项（D2）：设置开关开启才显示；CLI 未安装置灰 + tooltip（§3.5）。
+      未探测完成（cliInfo 为 null）时保守置灰（探测为轻量 where，瞬时完成）。 */
+  function terminalMenuItem(node) {
+    if (!terminalMenuEnabled) return null
+    const installed = cliInfo?.installed
+    return {
+      label: '在此打开 Claude Code 终端',
+      onClick: () => openTerminal(node),
+      disabled: !installed,
+      title:
+        cliInfo === null
+          ? '正在检测 Claude Code CLI…'
+          : installed
+            ? undefined
+            : '未检测到 Claude Code CLI'
+    }
+  }
+
   /** 开始重命名（4.3）：节点行转内联输入 */
   function startRename(node) {
     setContextMenu(null)
@@ -688,7 +724,7 @@ export default function Sidebar({
             openMenu(e, [
               { label: '新建文件', onClick: () => startCreateFile('') },
               { label: '新建文件夹', onClick: () => startCreate('', 'folder') },
-              { label: '在此打开 Claude Code 终端', onClick: () => openTerminal(null) }, // CC-3
+              ...(terminalMenuItem(null) ? [terminalMenuItem(null)] : []), // CC-5：开关 + CLI 置灰
               { label: '在资源管理器中打开', onClick: () => revealInExplorer(null) },
               { label: '刷新', onClick: () => refreshTree() } // 4.5：感知外部改动
             ])
@@ -743,7 +779,7 @@ export default function Sidebar({
                             label: '新建文件夹',
                             onClick: () => startCreate(node.relPath, 'folder')
                           },
-                          { label: '在此打开 Claude Code 终端', onClick: () => openTerminal(node) }, // CC-3
+                          ...(terminalMenuItem(node) ? [terminalMenuItem(node)] : []), // CC-5：开关 + CLI 置灰
                           { label: '在资源管理器中打开', onClick: () => revealInExplorer(node) },
                           { label: '重命名', onClick: () => startRename(node) },
                           { label: '删除', danger: true, onClick: () => startDelete(node) },

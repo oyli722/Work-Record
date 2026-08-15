@@ -41,7 +41,8 @@ export default function FocusOverlay({
   setListError,
   listLoading,
   setListLoading,
-  shortcutActionsRef
+  shortcutActionsRef,
+  terminalMenuEnabled
 }) {
   const [showTop, topEnter, topLeave] = useHover()
   const [showLeft, leftEnter, leftLeave] = useHover()
@@ -88,6 +89,7 @@ export default function FocusOverlay({
           listLoading={listLoading}
           setListLoading={setListLoading}
           shortcutActionsRef={shortcutActionsRef}
+          terminalMenuEnabled={terminalMenuEnabled}
         />
       </div>
     </div>
