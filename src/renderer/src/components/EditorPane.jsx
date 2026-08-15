@@ -22,9 +22,24 @@ function dirOf(relPath) {
 }
 
 export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef }) {
-  const { activeTab, currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
+  const {
+    activeTab,
+    activeKey,
+    tabs,
+    currentFile,
+    content,
+    saveState,
+    dirty,
+    error,
+    loading,
+    setContent,
+    save,
+    externalChange
+  } = editor
   // CC-3：终端 Tab 占满主内容区（D4），file 语义状态（content/saveState 等）终端下为空
   const isTerminal = activeTab?.type === 'terminal'
+  // D12 常驻终端面板：全部 terminal tab 挂载不卸载（缓冲保留），仅激活者显示，切回 refit
+  const terminalTabs = tabs.filter((t) => t.type === 'terminal')
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
   const baseDir = dirOf(currentFile ?? '')
@@ -236,7 +251,8 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
             onCloseRequest={(key) => setCloseQueue([key])}
             onBatchClose={startBatchClose}
           />
-          {/* CC-3 终端 Tab 占满主内容区（D4）：隐藏三态按钮 + 保存区（终端无保存语义），保留标题 + 专注入口 */}
+          {/* CC-3 终端 Tab 占满主内容区（D4）：隐藏三态按钮 + 保存区（终端无保存语义），保留标题 + 专注入口。
+              终端面板本体在下方针常驻渲染（D12），此处仅工具条 */}
           <div className="editor__bar">
             <span className="editor__file" title={`${activeTab.title}（${activeTab.cwdRelPath}）`}>
               {activeTab.title} — 终端
@@ -250,13 +266,6 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
             >
               <ExpandIcon width={16} height={16} />
             </button>
-          </div>
-          <div className="editor__body editor__body--terminal">
-            <TerminalPane
-              termId={activeTab.termId}
-              title={activeTab.title}
-              cwdRelPath={activeTab.cwdRelPath}
-            />
           </div>
         </>
       ) : currentFile ? (
@@ -363,6 +372,24 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
           )}
         </div>
       )}
+
+      {/* CC-3 常驻终端面板（D12）：全部 terminal tab 挂载不卸载，切走 display:none 保留缓冲；激活者显示并 refit */}
+      {!compare &&
+        terminalTabs.map((tab) => (
+          <div
+            key={tab.key}
+            className="editor__body editor__body--terminal"
+            style={{ display: tab.key === activeKey ? undefined : 'none' }}
+          >
+            <TerminalPane
+              termId={tab.termId}
+              title={tab.title}
+              cwdRelPath={tab.cwdRelPath}
+              active={tab.key === activeKey}
+            />
+          </div>
+        ))}
+
       {error && <p className="editor__error">{error}</p>}
 
       {/* 7.3 关闭流程覆盖确认（磁盘被外部修改时，确认后强制保存并关闭） */}

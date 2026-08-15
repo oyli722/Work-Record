@@ -41,7 +41,9 @@ export default [
         console: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
-        ResizeObserver: 'readonly' // 9.2.7 预览锚点重建（隐藏→显示触发）
+        ResizeObserver: 'readonly', // 9.2.7 预览锚点重建（隐藏→显示触发）
+        requestAnimationFrame: 'readonly', // CC-3 终端切回 refit（display:none → 可见后恢复尺寸）
+        cancelAnimationFrame: 'readonly'
       }
     },
     rules: {

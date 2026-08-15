@@ -1,19 +1,18 @@
 // 终端面板（CC Console，设计文档 §3.3）
 // xterm.js 挂载 + 与主进程 pty 双向数据流：term:data → terminal.write；terminal.onData → term:write。
-// CC-3 过渡版：TerminalPane 接收已创建的 termId（termId 由 editorStore.openTerminalTab 经 term:create 取得），
-// 挂载时绑定该 termId 数据流，卸载时**不 kill**——终端进程生命周期 = Tab 生命周期（D12 方向：
-// Tab 切走 xterm 重挂载重绑定、进程持续；滚动缓冲保留等精化在 CC-4 落地）。
+// 常驻模型（D12）：TerminalPane 接收已创建的 termId（editorStore.openTerminalTab 经 term:create 取得），
+// 由 EditorPane 常驻挂载——Tab 切走仅 display:none 隐藏（xterm 不卸载、缓冲与滚动不丢），
+// 切回时经 active 触发 refit 恢复尺寸；卸载（关闭 Tab）时**不 kill**——终端进程生命周期 = Tab 生命周期，
+// kill 归 confirmCloseTab / 应用退出（D11/D12）。
 // termId 为 null 时渲染占位态（设计 §3.6 重启恢复：会话已随上次退出关闭；重开按钮 CC-4 落地）。
-// 主题跟随 / 退出占位态 / 切换缓冲在 CC-4 完善，本组件先打通 Tab 生命周期驱动的数据流。
+// 主题跟随 / 退出占位态在 CC-4 完善，本组件已打通常驻缓冲与 Tab 生命周期驱动。
 
 import { useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-export default function TerminalPane({ termId = null, title = '终端', cwdRelPath = '.', fontSize = 13 }) {
-  const containerRef = useRef(null)
-
+export default function TerminalPane({ termId = null, title = '终端', cwdRelPath = '.', fontSize = 13, active = true }) {
   // 占位态：termId 为 null（重启恢复的 terminal tab，进程已随上次退出关闭）
   if (!termId) {
     return (
@@ -26,12 +25,13 @@ export default function TerminalPane({ termId = null, title = '终端', cwdRelPa
     )
   }
 
-  return <LiveTerminal termId={termId} title={title} fontSize={fontSize} containerRef={containerRef} />
+  return <LiveTerminal termId={termId} title={title} fontSize={fontSize} active={active} />
 }
 
-/** 实时终端：绑定已存在 termId 的数据流（xterm 每次挂载重建，CC-4 精化为常驻缓冲） */
-function LiveTerminal({ termId, fontSize }) {
+/** 实时终端：常驻绑定 termId 数据流（EditorPane 挂载期间不卸载，缓冲保留） */
+function LiveTerminal({ termId, fontSize, active }) {
   const containerRef = useRef(null)
+  const fitRef = useRef(null)
 
   useEffect(() => {
     const container = containerRef.current
@@ -47,12 +47,13 @@ function LiveTerminal({ termId, fontSize }) {
     term.loadAddon(fit)
     term.open(container)
     fit.fit()
+    fitRef.current = fit
 
     // 容器尺寸变化 → 重新 fit（终端跟随主内容区大小，避免 xterm-screen 停留在初始尺寸）
     const fitObserver = new ResizeObserver(() => fit.fit())
     fitObserver.observe(container)
 
-    // 主进程 → 终端：pty 输出写入（按 termId 过滤）
+    // 主进程 → 终端：pty 输出写入（按 termId 过滤；display:none 时组件仍挂载，输出照写缓冲）
     const offData = window.mework.term.onData((id, chunk) => {
       if (id === termId) term.write(chunk)
     })
@@ -72,15 +73,25 @@ function LiveTerminal({ termId, fontSize }) {
     term.focus()
 
     return () => {
+      fitRef.current = null
       fitObserver.disconnect()
       offData()
       offExit()
       dataDisposable.dispose()
       resizeDisposable.dispose()
       term.dispose()
-      // 不 kill：进程生命周期 = Tab 生命周期，kill 归 confirmCloseTab / 应用退出（D12）
+      // 不 kill：进程生命周期 = Tab 生命周期，kill 归 confirmCloseTab / 应用退出（D11/D12）
     }
   }, [termId, fontSize])
+
+  // 激活变化（切回/首次激活）：容器从 display:none 恢复尺寸，双重 rAF 待布局稳定后 refit
+  useEffect(() => {
+    if (!active) return
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitRef.current?.fit())
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [active])
 
   return <div className="terminal" ref={containerRef} />
 }
