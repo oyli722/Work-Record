@@ -11,12 +11,11 @@ import NewFileModal from './NewFileModal'
 import VersionPanel from './VersionPanel'
 import { CloseIcon } from './icons'
 import { dirOf, fileNameOf } from '../utils/path'
+import { isSupportedFile } from '../../../shared/format-registry'
 
-const DOC_EXT = /\.(md|txt)$/i
 // 9.2.8 目录树范围（用户定案：当前仅支持 无后缀 / .md / .txt）：
 // md/txt 正常显示；无后缀文件（不含「.」或 . 开头的点文件）也显示。
-// 其余后缀（yaml/js 等）随 V1.1 格式注册表扩展。
-const isDocFile = (name) => DOC_EXT.test(name) || !name.includes('.') || name.startsWith('.')
+// 其余后缀（yaml/js 等）随 V1.1 格式注册表扩展（src/shared/format-registry.js）。
 
 // 8.3 侧边栏拖拽调宽：宽度范围 + 默认（--sidebar-width 驱动 grid 列）
 const SIDEBAR_MIN = 160
@@ -199,12 +198,12 @@ export default function Sidebar({
     return res
   }
 
-  /** 将目录项构造成树节点：文件夹全保留、文件只留 MD/TXT；目录在前、文件在后，各按名称排序。
+  /** 将目录项构造成树节点：文件夹全保留、文件只留受支持格式（查格式注册表）；目录在前、文件在后，各按名称排序。
       items 来自 fs:list_detail（[{ name, isDirectory }]，4.1），已含类型，无需再逐项 stat。 */
   function buildNodes(items, parentPath) {
     const nodes = []
     for (const item of items) {
-      if (!item.isDirectory && !isDocFile(item.name)) continue
+      if (!item.isDirectory && !isSupportedFile(item.name)) continue
       nodes.push({
         name: item.name,
         relPath: parentPath ? `${parentPath}/${item.name}` : item.name,
@@ -612,7 +611,7 @@ export default function Sidebar({
     }
     for (const item of items) {
       if (existing.has(item.name)) continue
-      if (!item.isDirectory && !isDocFile(item.name)) continue
+      if (!item.isDirectory && !isSupportedFile(item.name)) continue
       next.push({
         name: item.name,
         relPath: parentRelPath ? `${parentRelPath}/${item.name}` : item.name,

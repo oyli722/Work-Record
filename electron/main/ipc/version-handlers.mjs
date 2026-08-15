@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { getActiveFs } from '../storage/fs-context.mjs'
 import { createVersionManager } from '../versions/version-manager.mjs'
+import { VERSION_EXPORT_FILTERS } from '../../../src/shared/format-registry'
 
 /**
  * 版本历史 IPC（阶段 5，PRD §3.1.2 前缀规范：fs:）
@@ -32,11 +33,7 @@ export function registerVersionHandlers() {
       const result = await dialog.showSaveDialog(win, {
         title: '导出版本',
         defaultPath,
-        filters: [
-          { name: 'Markdown', extensions: ['md'] },
-          { name: '文本', extensions: ['txt'] },
-          { name: '所有文件', extensions: ['*'] }
-        ]
+        filters: VERSION_EXPORT_FILTERS // 由格式注册表驱动（当前 md/txt，V1.1 随注册表扩展）
       })
       if (result.canceled || !result.filePath) return { ok: false, canceled: true }
       await writeFile(result.filePath, content, 'utf-8')

@@ -12,6 +12,7 @@ import TabBar from './TabBar'
 import TerminalPane from './TerminalPane'
 import { ExpandIcon } from './icons'
 import { dirOf, fileNameOf } from '../utils/path'
+import { isMarkdownFile } from '../../../shared/format-registry'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
@@ -35,7 +36,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
   const isTerminal = activeTab?.type === 'terminal'
   // D12 常驻终端面板：全部 terminal tab 挂载不卸载（缓冲保留），仅激活者显示，切回 refit
   const terminalTabs = tabs.filter((t) => t.type === 'terminal')
-  const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
+  const isMarkdown = isMarkdownFile(currentFile) // 预览路由查格式注册表（TXT 退化为纯文本）
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
   const baseDir = dirOf(currentFile ?? '')
   const [mode, setMode] = useState('split') // split | edit | preview

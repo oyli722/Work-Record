@@ -5,17 +5,21 @@
 // 更多格式随 V1.1 格式注册表扩展，届时未配置高亮/预览的后缀也可设置文本化展示）。
 // 输入框基名全选：直接输入即整体替换；样式复用确认弹窗 + 树内联输入。
 import { useEffect, useRef, useState } from 'react'
+import { isSupportedExt, NEW_FILE_SUFFIXES } from '../../../shared/format-registry'
 
+// 后缀选项由格式注册表驱动（当前 无后缀 / .md / .txt；V1.1 随注册表扩展，
+// 届时未配置高亮/预览的后缀也可设置文本化展示）
 const SUFFIX_OPTIONS = [
   { value: '', label: '无后缀' },
-  { value: '.md', label: '.md' },
-  { value: '.txt', label: '.txt' }
+  ...NEW_FILE_SUFFIXES.filter((s) => s).map((s) => ({ value: s, label: s }))
 ]
 
-/** 从完整文件名拆出基名与后缀（仅识别 md/txt；其余按无后缀处理） */
+/** 从完整文件名拆出基名与后缀（仅识别注册表支持的后缀；其余按无后缀处理） */
 function splitName(fullName) {
-  const m = /^(.+)\.(md|txt)$/i.exec(fullName ?? '')
-  if (m) return { base: m[1], suffix: `.${m[2].toLowerCase()}` }
+  const m = /^(.+)\.([^.]+)$/.exec(fullName ?? '')
+  if (m && isSupportedExt(`.${m[2].toLowerCase()}`)) {
+    return { base: m[1], suffix: `.${m[2].toLowerCase()}` }
+  }
   return { base: fullName ?? '', suffix: '' }
 }
 
