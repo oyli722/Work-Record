@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { isExternalLink } from '../../src/shared/link-policy'
+import { IPC } from '../../src/shared/ipc-channels'
 import { getActiveFs } from './storage/fs-context.mjs'
 import { registerFsHandlers } from './ipc/fs-handlers.mjs'
 import { registerWorkspaceHandlers } from './ipc/workspace-handlers.mjs'
@@ -108,7 +109,7 @@ app.on('before-quit', () => {
 /** 注册 IPC handler（PRD §3.1.2：通道前缀规范 fs: / win: / editor:） */
 function registerIpcHandlers() {
   // 阶段 1 连通性自检：渲染进程 ping 主进程，验证 contextBridge 链路（PRD §阶段1 交付物）
-  ipcMain.handle('fs:ping', () => ({
+  ipcMain.handle(IPC.fs.ping, () => ({
     ok: true,
     pong: 'pong',
     ts: Date.now()
@@ -127,7 +128,7 @@ function registerIpcHandlers() {
   // 协议白名单经 src/shared/link-policy.js（用户定案 http/https/mailto/tel，评审 S3 单一来源）；
   // 渲染层 DOMPurify 已限 URI 协议，此处是主进程纵深防御（评审 P1 加固思路）。
   // 图片不受影响，仍在应用内显示（3.5）。评审 S2：await 真实结果，打开失败返回 {ok:false}。
-  ipcMain.handle('win:open_external', async (_e, url) => {
+  ipcMain.handle(IPC.win.openExternal, async (_e, url) => {
     if (!isExternalLink(url)) {
       return { ok: false, reason: 'unsupported-protocol' }
     }
@@ -142,12 +143,12 @@ function registerIpcHandlers() {
 
   // 9.3.5 应用版本号（阶段 8.4 O1）：动态读取 app.getVersion()（源自 package.json），
   // 关于页不再硬编码；打包后同样返回 bundle 版本。
-  ipcMain.handle('win:get_app_version', () => app.getVersion())
+  ipcMain.handle(IPC.win.getAppVersion, () => app.getVersion())
 
   // 9.2.8 资源管理器定位/打开（PRD §3.1.2 前缀 win:）：渲染进程请求在系统资源管理器中
   // 定位文件（showItemInFolder）或打开文件夹/工作区根（openPath）。
   // 绝对路径经 fs-ops.resolveAbsolute 沙箱解析（PRD §7.1），不直接信任渲染进程拼接路径。
-  ipcMain.handle('win:reveal', async (_e, relPath, isDir) => {
+  ipcMain.handle(IPC.win.reveal, async (_e, relPath, isDir) => {
     try {
       const abs = await getActiveFs().resolveAbsolute(relPath)
       if (isDir) {
