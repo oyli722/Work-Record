@@ -71,7 +71,8 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
           return { ok: false, externalChange: true } // 磁盘被外部修改（4.5）
         }
       } catch {
-        /* stat 失败（外部删除等）：继续保存 */
+        /* stat 失败（外部删除等）：继续保存。P2-5 用户定案（2026-08-16）：
+           文件被外部删除后保存即静默重建（内容 = 当前编辑内容），不加 UI 提示——有意行为，勿改 */
       }
     }
     updateTab(relPath, (t) => ({ ...t, saveState: 'saving' }))
