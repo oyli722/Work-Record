@@ -17,7 +17,8 @@
 3. **需求规格文档.md** — 完整需求与已锁定架构（实现前查相关模块）
 4. **开发计划.md** — 各阶段目标与验收标准
 
-再跑 `git log --oneline -5` 与 `git tag` 看历史进度。
+再按需补充：《docs/当前实现-架构设计.md》（as-built 现状）、《docs/V1.1-规划.md》（V1.1 排期）、
+《docs/CC终端集成-设计文档.md》（终端集成）。最后跑 `git log --oneline -5` 与 `git tag` 看历史进度。
 
 ## 工作循环（每次推进一个子阶段）
 
@@ -63,10 +64,11 @@
 ## 开发命令（阶段 1 起启用）
 
 `npm install` · `npm run dev`（开发） · `npm run build`（构建） · `npm run lint` · `npm run format`
-- **单测**：`npm test` = `node --test`（阶段 1 建立后启用）
+- **单测**：`npm test` = `node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test`
+  （11 文件 74 用例：主进程 6 + 渲染进程纯函数 5；flag 压制 Node 直导渲染进程 .js ESM 模块的类型警告，勿改）
 
 ## 当前进度快照
 
-- 当前状态：阶段 0–9 全部完成（最近 tag `v1.1.0-optimize`），进入 V1.1 迭代规划
+- 当前状态：阶段 0–9 + CC Console 全部完成（最近 tag `v1.1.0-optimize`）；**代码优化专项（OPT-1~4）全部闭环**（2026-08-16，诊断与登记见《进度看板.md》待办区；诊断文档已归档《docs/归档/代码优化分析-现状诊断.md》）
 - 下一个待办：V1.1 排期两项（多文件格式支持 / MD 内嵌 HTML，见《docs/V1.1-规划.md》）
 - 历史开发日志：阶段 0–9 子阶段清单已归档至《docs/归档/进度看板V1.md》（详见《进度看板.md》）
