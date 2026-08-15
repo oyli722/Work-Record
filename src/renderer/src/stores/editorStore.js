@@ -11,6 +11,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { addOpenTab, clearOpenTabs, removeOpenTabs, updateOpenTabs } from './openTabsStorage'
+import { deriveFileState } from '../utils/tab-state'
 
 // 自动保存防抖间隔默认 30s（由 useEditorSettings 传入，3.9）
 const DEFAULT_DELAY = 30000
@@ -39,21 +40,6 @@ function createTab(relPath, content) {
 function createTerminalTab({ termId, cwdRelPath, title, exited = false, exitCode = null }) {
   const key = termId ? `terminal:${termId}` : `terminal:restore:${++restoreSeq}`
   return { type: 'terminal', key, termId: termId ?? null, cwdRelPath, title, exited, exitCode }
-}
-
-/** 由活动标签派生 file 语义状态（UI 直接消费；terminal 标签下恒为 file 空值）。
-    纯函数，供 useEditor 返回体与未来单测共用。 */
-export function deriveFileState(activeTab) {
-  const isFile = activeTab?.type === 'file'
-  return {
-    currentFile: isFile ? activeTab.relPath : null,
-    content: isFile ? activeTab.content : '',
-    saveState: isFile ? activeTab.saveState : 'saved',
-    dirty: isFile && activeTab.saveState === 'dirty',
-    error: isFile ? activeTab.error : null,
-    loading: isFile ? activeTab.loading : false,
-    externalChange: isFile ? activeTab.externalChange : false
-  }
 }
 
 export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DEFAULT_DELAY } = {}) {

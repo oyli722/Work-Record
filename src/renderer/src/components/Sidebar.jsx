@@ -1,8 +1,12 @@
 // 侧边栏（布局定案 2026-08-09）
-// 顶部：当前工作区（路径 + 切换菜单）；下方：目录树最小形态（3.1 交互定案——
+// 顶部：当前工作区（路径 + 切换菜单）；下方：目录树（3.1 交互定案——
 // 极简文件夹图标置树区顶部、默认收起一键展开/收回；展示嵌套子文件夹，点击整行展开/关闭，
-// 懒加载子级；文件节点点击打开）。阶段 4 在此演进为完整目录树 CRUD。
+// 懒加载子级；文件节点点击打开）。阶段 4 演进为完整目录树 CRUD。
 // 工作区路径在此显示，顶栏不再承载工作区信息。
+//
+// OPT-3a：目录树数据与操作已拆分到 useFileTree hook（App 持有，专注模式主/浮层共享同一实例），
+// 纯函数在 utils/file-tree.js（可单测）；本组件只做 UI 编排：
+// 右键菜单 / 内联输入 / 弹窗 / 与 editor（打开文件、关闭受影响标签）联动 / 工作区切换。
 import { useEffect, useRef, useState } from 'react'
 import FileTree, { FolderIcon, InlineInput } from './FileTree'
 import ContextMenu from './ContextMenu'
@@ -11,34 +15,36 @@ import NewFileModal from './NewFileModal'
 import VersionPanel from './VersionPanel'
 import { CloseIcon } from './icons'
 import { dirOf, fileNameOf } from '../utils/path'
-import { isSupportedFile } from '../../../shared/format-registry'
-
-// 9.2.8 目录树范围（用户定案：当前仅支持 无后缀 / .md / .txt）：
-// md/txt 正常显示；无后缀文件（不含「.」或 . 开头的点文件）也显示。
-// 其余后缀（yaml/js 等）随 V1.1 格式注册表扩展（src/shared/format-registry.js）。
 
 // 8.3 侧边栏拖拽调宽：宽度范围 + 默认（--sidebar-width 驱动 grid 列）
 const SIDEBAR_MIN = 160
 const SIDEBAR_MAX = 400
 const SIDEBAR_DEFAULT = 240
 
-export default function Sidebar({
-  workspace,
-  editor,
-  tree,
-  setTree,
-  listOpen,
-  setListOpen,
-  listError,
-  setListError,
-  listLoading,
-  setListLoading,
-  onCompareChange,
-  shortcutActionsRef,
-  terminalMenuEnabled
-}) {
-  // 目录树状态（tree/listOpen/listError/listLoading）由 App 持有（3.8 评审 P1 状态提升），
-  // 专注模式主/浮层 Sidebar 共享，进出专注不丢失；menuOpen 为临时下拉，保留组件内部。
+export default function Sidebar({ workspace, editor, fileTree, onCompareChange, shortcutActionsRef, terminalMenuEnabled }) {
+  // fileTree（useFileTree，App 持有）：树数据与操作。3.8 评审 P1 状态提升——
+  // 专注模式主/浮层 Sidebar 共享同一实例，进出专注不丢失。
+  const {
+    tree,
+    listOpen,
+    listError,
+    listLoading,
+    setListOpen,
+    setListError,
+    toggleList,
+    toggleFolder,
+    toggleFolderRecursive,
+    refreshTree,
+    refreshBranch,
+    ensureFolderLoaded,
+    createNode,
+    renameNode,
+    deleteNode,
+    createFileDefault,
+    reset
+  } = fileTree
+
+  // menuOpen 为临时下拉（工作区切换菜单），保留组件内部
   const [menuOpen, setMenuOpen] = useState(false)
 
   // CC-5 CLI 检测（设计 §3.5）：挂载探测一次并缓存；未安装 → 终端右键项置灰 + tooltip
@@ -117,6 +123,7 @@ export default function Sidebar({
     window.removeEventListener('mousemove', onResizeMove)
     window.removeEventListener('mouseup', onResizeUp)
   }
+
   // 4.2 目录树右键菜单（阶段 4 CRUD 唯一入口，用户定案）+ 新建中的内联输入
   const [contextMenu, setContextMenu] = useState(null) // { x, y, items }
   const [creating, setCreating] = useState(null) // { parentRelPath, type: 'file' | 'folder' }
@@ -185,167 +192,23 @@ export default function Sidebar({
     return doSwitch(absPath)
   }
 
-  /** 实际切换：取消激活当前（清空 fs 边界）→ 激活新路径 → 关闭全部标签 */
+  /** 实际切换：取消激活当前（清空 fs 边界）→ 激活新路径 → 关闭全部标签 → 重置目录树 */
   async function doSwitch(absPath) {
     await workspace.deactivate()
     const res = await workspace.activate(absPath)
     editor.close()
     if (res.ok) {
-      setTree(null)
-      setListError(null)
-      setListOpen(false)
+      reset() // 清空并收起目录树（评审 P2：不残留旧工作区数据）
     }
     return res
   }
 
-  /** 将目录项构造成树节点：文件夹全保留、文件只留受支持格式（查格式注册表）；目录在前、文件在后，各按名称排序。
-      items 来自 fs:list_detail（[{ name, isDirectory }]，4.1），已含类型，无需再逐项 stat。 */
-  function buildNodes(items, parentPath) {
-    const nodes = []
-    for (const item of items) {
-      if (!item.isDirectory && !isSupportedFile(item.name)) continue
-      nodes.push({
-        name: item.name,
-        relPath: parentPath ? `${parentPath}/${item.name}` : item.name,
-        isDir: item.isDirectory,
-        expanded: false,
-        loading: false,
-        error: null,
-        children: null
-      })
-    }
-    return nodes.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
-      return a.name.localeCompare(b.name, 'zh')
-    })
-  }
-
-  /** 不可变更新目录树中指定节点（4.1，评审 S2：不再直接 mutate 节点对象） */
-  function updateNode(nodes, relPath, updater) {
-    return nodes.map((n) => {
-      if (n.relPath === relPath) return updater(n)
-      if (n.children) return { ...n, children: updateNode(n.children, relPath, updater) }
-      return n
-    })
-  }
-
-  /** 不可变替换目录树中指定节点（9.2.3 递归展开后整体替换） */
-  function replaceNode(nodes, relPath, newNode) {
-    return nodes.map((n) => {
-      if (n.relPath === relPath) return newNode
-      if (n.children) return { ...n, children: replaceNode(n.children, relPath, newNode) }
-      return n
-    })
-  }
-
-  /** 加载根层节点（首次展开时） */
-  async function loadRoot() {
-    setListLoading(true)
-    setListError(null)
-    try {
-      const items = await window.mework.fs.listDetail('.')
-      setTree(buildNodes(items, ''))
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    } finally {
-      setListLoading(false)
-    }
-  }
-
-  /** 展开/关闭文件夹节点（懒加载子级；关闭时释放子数据保持新鲜；不可变更新） */
-  async function toggleFolder(node) {
-    if (node.expanded) {
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null }))
-      )
-      return
-    }
-    setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, loading: true })))
-    try {
-      const items = await window.mework.fs.listDetail(node.relPath)
-      const children = buildNodes(items, node.relPath)
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({
-          ...n,
-          expanded: true,
-          loading: false,
-          children,
-          error: null
-        }))
-      )
-    } catch (err) {
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({
-          ...n,
-          loading: false,
-          error: String(err?.message ?? err)
-        }))
-      )
-    }
-  }
-
-  /** 递归展开/收起整个子树（9.2.3 用户反馈：点击箭头，子文件夹递归展开）。
-      展开：逐层懒加载所有子文件夹；收起：目标节点整棵折叠。 */
-  async function toggleFolderRecursive(node) {
-    if (node.expanded) {
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({ ...n, expanded: false, children: null }))
-      )
-      return
-    }
-    setTree((t) => updateNode(t, node.relPath, (n) => ({ ...n, expanded: true, loading: true })))
-    try {
-      const expandedNode = await expandNode(node)
-      setTree((t) => replaceNode(t, node.relPath, expandedNode))
-    } catch (err) {
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({
-          ...n,
-          loading: false,
-          error: String(err?.message ?? err)
-        }))
-      )
-    }
-  }
-
-  /** 递归展开节点：拉取每层子级并展开所有子文件夹（返回更新后的节点树） */
-  async function expandNode(node) {
-    const items = await window.mework.fs.listDetail(node.relPath)
-    const children = buildNodes(items, node.relPath)
-    const expandedChildren = []
-    for (const child of children) {
-      expandedChildren.push(
-        child.isDir ? await expandNode({ ...child, expanded: true, loading: false }) : child
-      )
-    }
-    return { ...node, expanded: true, loading: false, error: null, children: expandedChildren }
-  }
-
-  function toggleList() {
-    const next = !listOpen
-    if (next && !tree && !listLoading) loadRoot()
-    setListOpen(next)
-  }
-
-  /** 右键打开菜单（阶段 4 入口）：工作区未激活 / 空菜单（如 4.2 文件节点暂无操作）不弹 */
+  /** 右键打开菜单（阶段 4 入口）：工作区未激活 / 空菜单不弹 */
   function openMenu(e, items) {
     e.preventDefault()
     e.stopPropagation()
     if (workspace.state !== 'active' || !items?.length) return
     setContextMenu({ x: e.clientX, y: e.clientY, items })
-  }
-
-  /** 生成不冲突的最终名（同目录重名自动加序号，如「未命名 2.md」） */
-  async function uniqueName(parentRelPath, name) {
-    const items = await window.mework.fs.listDetail(parentRelPath || '.') // 根目录用 '.'（空路径被 pathGuard 拒绝）
-    const existing = new Set(items.map((i) => i.name))
-    if (!existing.has(name)) return name
-    const dot = name.lastIndexOf('.')
-    const stem = dot > 0 ? name.slice(0, dot) : name
-    const ext = dot > 0 ? name.slice(dot) : ''
-    let i = 2
-    while (existing.has(`${stem} ${i}${ext}`)) i += 1
-    return `${stem} ${i}${ext}`
   }
 
   /** 开始新建：目标文件夹未展开则先展开加载，再进入内联输入 */
@@ -356,65 +219,31 @@ export default function Sidebar({
       // 根级新建：确保列表展开，输入行可见（列表收起或工作区为空时同样可新建）
       setListOpen(true)
     } else {
-      setTree((t) => updateNode(t, parentRelPath, (n) => ({ ...n, expanded: true, loading: true })))
-      try {
-        const items = await window.mework.fs.listDetail(parentRelPath)
-        const children = buildNodes(items, parentRelPath)
-        setTree((t) =>
-          updateNode(t, parentRelPath, (n) => ({ ...n, loading: false, children, error: null }))
-        )
-      } catch (err) {
-        setTree((t) =>
-          updateNode(t, parentRelPath, (n) => ({
-            ...n,
-            loading: false,
-            error: String(err?.message ?? err)
-          }))
-        )
-      }
+      await ensureFolderLoaded(parentRelPath)
     }
     setCreating({ parentRelPath, type })
   }
 
-  /** 提交新建：MD 空文件（自动打开编辑）/ 文件夹；冲突自动序号；刷新父目录（PRD §4.3.3） */
+  /** 提交新建：空文件（自动打开编辑）/ 文件夹；冲突自动序号；刷新父目录（PRD §4.3.3） */
   async function submitCreate(rawName) {
     const { parentRelPath, type } = creating
     setCreating(null)
-    const name = rawName.trim().replace(/[/\\]/g, '-') // 去除路径分隔符，防嵌套
-    if (!name) return
-    try {
-      const finalName = await uniqueName(parentRelPath, name)
-      const relPath = parentRelPath ? `${parentRelPath}/${finalName}` : finalName
-      if (type === 'folder') {
-        await window.mework.fs.mkdir(relPath)
-      } else {
-        await window.mework.fs.writeFile(relPath, '') // 空文件（用户定案）
-        await editor.openFile(relPath) // 新建 MD 自动打开（用户定案）
-      }
-      await refreshParent(parentRelPath)
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
+    const r = await createNode({ parentRelPath, type, rawName })
+    if (!r.ok) return
+    if (type !== 'folder') await editor.openFile(r.relPath) // 新建 MD 自动打开（用户定案）
   }
 
   function cancelCreate() {
     setCreating(null)
   }
 
-  /** 9.2.8 新建文件（先建默认名再改，用户定案）：立即以默认名建空文件并打开，
-      刷新父目录后弹窗让用户改名称/后缀；取消则保留默认名。默认名 uniqueName 去重。 */
+  /** 9.2.8 新建文件（先建默认名再改，用户定案）：默认名建空文件 → 打开 → 弹窗改名 */
   async function startCreateFile(parentRelPath) {
     setContextMenu(null)
-    try {
-      const name = await uniqueName(parentRelPath, '未命名.md')
-      const relPath = parentRelPath ? `${parentRelPath}/${name}` : name
-      await window.mework.fs.writeFile(relPath, '') // 空文件
-      await editor.openFile(relPath) // 打开
-      await refreshParent(parentRelPath) // 新文件入树
-      setNewFileModal({ relPath, name })
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
+    const r = await createFileDefault(parentRelPath)
+    if (!r.ok) return
+    await editor.openFile(r.relPath) // 打开
+    setNewFileModal({ relPath: r.relPath, name: r.name })
   }
 
   /** 9.2.8 提交新建文件改名（弹窗确定）：重命名 + 同步打开标签与树。重名预检拒绝（评审 P3 同款）。 */
@@ -440,7 +269,7 @@ export default function Sidebar({
     try {
       await window.mework.fs.renameWithVersions(relPath, newRelPath)
       editor.renameCurrentFile(relPath, newRelPath)
-      await refreshParent(parentRelPath)
+      await fileTree.refreshParent(parentRelPath)
     } catch (err) {
       setListError(String(err?.message ?? err))
     }
@@ -459,8 +288,7 @@ export default function Sidebar({
     }
   }
 
-  /** CC-3 最小入口：在此打开 Claude Code 终端（设计 D2 顶层与任意分层文件夹右键；
-      完整入口 CC-5 升级为设置开关控制 + CLI 未装置灰）。失败经 setListError 提示。 */
+  /** CC-3 最小入口：在此打开 Claude Code 终端（设计 D2 顶层与任意分层文件夹右键）。失败经 setListError 提示。 */
   async function openTerminal(node) {
     setContextMenu(null)
     const cwdRelPath = node ? node.relPath : '.'
@@ -501,27 +329,10 @@ export default function Sidebar({
   async function submitRename(rawName) {
     const node = renaming
     setRenaming(null)
-    const newName = rawName.trim().replace(/[/\\]/g, '-')
-    if (!newName || newName === node.name) return
-    const parentRelPath = dirOf(node.relPath)
-    const newRelPath = parentRelPath ? `${parentRelPath}/${newName}` : newName
-    // 评审 P3：目标已存在则拒绝（POSIX/macOS 下 rename 会静默覆盖已存在文件，数据安全）
-    let targetExists = false
-    try {
-      targetExists = (await window.mework.fs.stat(newRelPath)).exists
-    } catch {
-      targetExists = false // 目标不存在（ENOENT），允许重命名
-    }
-    if (targetExists) {
-      setListError(`已存在同名目标「${newName}」，重命名已取消。`)
-      return
-    }
-    try {
-      await window.mework.fs.renameWithVersions(node.relPath, newRelPath)
-      editor.renameCurrentFile(node.relPath, newRelPath) // 打开中的文件同步新路径，避免保存到旧路径
-      await refreshParent(parentRelPath)
-    } catch (err) {
-      setListError(String(err?.message ?? err))
+    const r = await renameNode(node, rawName)
+    if (!r.ok) return
+    if (r.relPath !== node.relPath) {
+      editor.renameCurrentFile(node.relPath, r.relPath) // 打开中的文件同步新路径，避免保存到旧路径
     }
   }
 
@@ -549,14 +360,9 @@ export default function Sidebar({
   async function confirmDelete() {
     const node = deleteTarget
     setDeleteTarget(null)
-    const parentRelPath = dirOf(node.relPath)
-    try {
-      await window.mework.fs.deleteWithVersions(node.relPath)
-      editor.closeIfPathDeleted(node.relPath)
-      await refreshParent(parentRelPath)
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
+    const r = await deleteNode(node)
+    if (!r.ok) return
+    editor.closeIfPathDeleted(node.relPath)
   }
 
   function cancelDelete() {
@@ -567,96 +373,6 @@ export default function Sidebar({
   function openVersionPanel(node) {
     setContextMenu(null)
     setVersionPanelFor(node.relPath)
-  }
-
-  /** 刷新目标目录的子树（新建/后续 CRUD 后调用） */
-  async function refreshParent(parentRelPath) {
-    if (parentRelPath === '') {
-      await loadRoot()
-      return
-    }
-    try {
-      const items = await window.mework.fs.listDetail(parentRelPath)
-      const children = buildNodes(items, parentRelPath)
-      setTree((t) =>
-        updateNode(t, parentRelPath, (n) => ({
-          ...n,
-          children,
-          expanded: true,
-          loading: false,
-          error: null
-        }))
-      )
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
-  }
-
-  /** 递归刷新目录树（保留展开状态，感知外部改动；4.5，PRD §4.3.6）。
-      磁盘中已删除的节点移除、新增的项追加；已展开的文件夹递归刷新子级。 */
-  async function refreshTreeNodes(nodes, parentRelPath) {
-    const items = await window.mework.fs.listDetail(parentRelPath || '.') // 根目录用 '.'
-    const diskByName = new Map(items.map((i) => [i.name, i]))
-    const existing = new Set(nodes.map((n) => n.name))
-    const next = []
-    for (const node of nodes) {
-      const disk = diskByName.get(node.name)
-      if (!disk) continue // 磁盘已删除该节点
-      if (node.isDir && node.expanded) {
-        const children = node.children ? await refreshTreeNodes(node.children, node.relPath) : null
-        next.push({ ...node, children, error: null }) // 保留展开
-      } else {
-        next.push({ ...node, isDir: disk.isDirectory })
-      }
-    }
-    for (const item of items) {
-      if (existing.has(item.name)) continue
-      if (!item.isDirectory && !isSupportedFile(item.name)) continue
-      next.push({
-        name: item.name,
-        relPath: parentRelPath ? `${parentRelPath}/${item.name}` : item.name,
-        isDir: item.isDirectory,
-        expanded: false,
-        loading: false,
-        error: null,
-        children: null
-      })
-    }
-    return next.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
-      return a.name.localeCompare(b.name, 'zh')
-    })
-  }
-
-  /** 刷新整个目录树（保留展开状态） */
-  async function refreshTree() {
-    if (!tree) {
-      await loadRoot()
-      return
-    }
-    try {
-      setTree(await refreshTreeNodes(tree, ''))
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
-  }
-
-  /** 刷新指定文件夹子树 */
-  async function refreshBranch(node) {
-    try {
-      const children = await refreshTreeNodes(node.children ?? [], node.relPath)
-      setTree((t) =>
-        updateNode(t, node.relPath, (n) => ({
-          ...n,
-          children,
-          expanded: true,
-          loading: false,
-          error: null
-        }))
-      )
-    } catch (err) {
-      setListError(String(err?.message ?? err))
-    }
   }
 
   return (

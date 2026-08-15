@@ -33,14 +33,7 @@ export default function FocusOverlay({
   workspace,
   editor,
   onExitFocus,
-  tree,
-  setTree,
-  listOpen,
-  setListOpen,
-  listError,
-  setListError,
-  listLoading,
-  setListLoading,
+  fileTree,
   shortcutActionsRef,
   terminalMenuEnabled
 }) {
@@ -80,14 +73,7 @@ export default function FocusOverlay({
         <Sidebar
           workspace={workspace}
           editor={editor}
-          tree={tree}
-          setTree={setTree}
-          listOpen={listOpen}
-          setListOpen={setListOpen}
-          listError={listError}
-          setListError={setListError}
-          listLoading={listLoading}
-          setListLoading={setListLoading}
+          fileTree={fileTree}
           shortcutActionsRef={shortcutActionsRef}
           terminalMenuEnabled={terminalMenuEnabled}
         />

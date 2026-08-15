@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import useTheme from './hooks/useTheme'
 import useEditorSettings from './hooks/useEditorSettings'
 import useFontSettings, { FONT_STACKS } from './hooks/useFontSettings'
+import useFileTree from './hooks/useFileTree'
 import useWorkspace from './stores/workspaceStore'
 import useEditor from './stores/editorStore'
 import { readOpenTabs, removeOpenTabs } from './stores/openTabsStorage'
@@ -37,11 +38,9 @@ export default function App() {
   editorRef.current = editor
   const [focus, setFocus] = useState(false)
   // 目录树状态提升到 App（3.8 评审 P1）：专注模式主/浮层 Sidebar 共享同一份状态，
-  // 避免进出专注时组件实例卸载导致树数据/展开态丢失；阶段 4 目录树演进同样需要状态外移。
-  const [tree, setTree] = useState(null)
-  const [listOpen, setListOpen] = useState(false)
-  const [listError, setListError] = useState(null)
-  const [listLoading, setListLoading] = useState(false)
+  // 避免进出专注时组件实例卸载导致树数据/展开态丢失；OPT-3a 起由 useFileTree 统一管理
+  // （数据 + 操作，纯函数层在 utils/file-tree.js 可单测）
+  const fileTree = useFileTree({ fs: window.mework.fs })
   // 5.4 版本对比：版本面板选中版本时主区进入对比模式（{ left, right, leftLabel, rightLabel } | null）
   const [compare, setCompare] = useState(null)
 
@@ -202,14 +201,7 @@ export default function App() {
           <Sidebar
             workspace={workspace}
             editor={editor}
-            tree={tree}
-            setTree={setTree}
-            listOpen={listOpen}
-            setListOpen={setListOpen}
-            listError={listError}
-            setListError={setListError}
-            listLoading={listLoading}
-            setListLoading={setListLoading}
+            fileTree={fileTree}
             onCompareChange={setCompare}
             shortcutActionsRef={shortcutActionsRef}
             terminalMenuEnabled={settings.terminalMenuEnabled}
@@ -241,14 +233,7 @@ export default function App() {
           workspace={workspace}
           editor={editor}
           onExitFocus={() => setFocus(false)}
-          tree={tree}
-          setTree={setTree}
-          listOpen={listOpen}
-          setListOpen={setListOpen}
-          listError={listError}
-          setListError={setListError}
-          listLoading={listLoading}
-          setListLoading={setListLoading}
+          fileTree={fileTree}
           shortcutActionsRef={shortcutActionsRef}
           terminalMenuEnabled={settings.terminalMenuEnabled}
         />

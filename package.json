@@ -11,7 +11,7 @@
     "preview": "electron-vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "node --test",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test",
     "dist": "cross-env HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 npm run build && electron-builder --win"
   },
   "build": {

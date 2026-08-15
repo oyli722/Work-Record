@@ -13,13 +13,14 @@ export function isSupportedExt(ext) {
   return typeof ext === 'string' && SUPPORTED_EXTS.has(ext.toLowerCase())
 }
 
-/** 文件名/相对路径是否受支持（md/txt；无后缀文件；点文件——9.2.8 目录树范围定案） */
+/** 文件名/相对路径是否受支持（md/txt；无后缀文件；点文件——9.2.8 目录树范围定案）。
+    空/非字符串输入视为不支持（readdir 实际不会产出空名，纯防御）。 */
 export function isSupportedFile(name) {
-  const n = String(name ?? '')
-  if (!n.includes('.')) return true // 无后缀文件
-  if (n.startsWith('.')) return true // 点文件（.gitignore 等，随目录树显示）
-  const dot = n.lastIndexOf('.')
-  return dot > 0 && isSupportedExt(n.slice(dot))
+  if (typeof name !== 'string' || name.length === 0) return false
+  if (!name.includes('.')) return true // 无后缀文件
+  if (name.startsWith('.')) return true // 点文件（.gitignore 等，随目录树显示）
+  const dot = name.lastIndexOf('.')
+  return dot > 0 && isSupportedExt(name.slice(dot))
 }
 
 /** 是否按 Markdown 渲染（预览路由；当前仅 .md，TXT 退化为纯文本） */
