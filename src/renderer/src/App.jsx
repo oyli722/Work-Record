@@ -80,19 +80,24 @@ export default function App() {
   const isRestoring = workspace.state === 'activating'
 
   // 7.4 启动恢复：工作区激活后重新打开上次的标签列表（PRD §4.7.3）。
+  // CC-3 持久化迁移（设计 §3.1/§3.6）：file 条目 openFile；terminal 条目恢复为占位 Tab（进程已随退出关闭）。
   // 串行 await 避免并发竞态（评审 P1）；恢复失败（文件被删）剔除持久化路径（评审 S3）。
   const restoredRef = useRef(false)
   useEffect(() => {
     if (isActive && !restoredRef.current) {
       restoredRef.current = true
       ;(async () => {
-        for (const relPath of readOpenTabs()) {
-          const r = await editor.openFile(relPath)
+        for (const item of readOpenTabs()) {
+          if (item.type === 'terminal') {
+            editor.restoreTerminalTab({ cwdRelPath: item.cwdRelPath, title: item.title })
+            continue
+          }
+          const r = await editor.openFile(item.relPath)
           if (!r.ok) {
             try {
               localStorage.setItem(
                 OPEN_TABS_KEY,
-                JSON.stringify(readOpenTabs().filter((p) => p !== relPath))
+                JSON.stringify(readOpenTabs().filter((it) => !(it.type === 'file' && it.relPath === item.relPath)))
               )
             } catch {
               /* 静默 */
@@ -110,15 +115,12 @@ export default function App() {
   activeRef.current = isActive
 
   // 专注模式快捷键（capture 确保先于 CodeMirror 消费 Esc；F11 preventDefault 防系统全屏）
-  // 焦点在终端内时 F11 让渡给终端（设计文档 D10），不触发专注
+  // D10 快捷键让渡：终端 Tab 激活时 F11/Esc 也直达 pty，不触发专注（原「焦点在 .terminal 内」判断由 activeTab 判定取代）
   useEffect(() => {
     function onKeydown(e) {
+      if (editorRef.current.activeTab?.type === 'terminal') return
       if (e.key === 'F11') {
         if (!activeRef.current) return // 未激活工作区：放行 F11，不吞掉系统行为（评审 S3）
-        if (document.activeElement?.closest('.terminal, .xterm')) {
-          e.preventDefault() // 终端内：阻止全屏 + 不触发专注（D10）
-          return
-        }
         e.preventDefault()
         setFocus((f) => !f) // 仅工作区激活时可切换（用户定案）
       } else if (e.key === 'Escape' && focusRef.current) {
@@ -136,17 +138,20 @@ export default function App() {
   useEffect(() => {
     function onKeydown(e) {
       if (document.querySelector('.settings__mask, .confirm-dialog__mask')) return
-      const a = shortcutActionsRef.current
       const ed = editorRef.current
+      // D10 快捷键让渡：终端 Tab 激活时全部键盘输入（含 Ctrl+S/W/N、Ctrl+Tab 等）直达 pty，
+      // MeWork 全局快捷键不拦截（关闭靠 ✕ / 右键）
+      if (ed.activeTab?.type === 'terminal') return
+      const a = shortcutActionsRef.current
       const mod = e.ctrlKey && !e.altKey
       if (mod && e.key === 'Tab') {
         e.preventDefault()
         const tabs = ed.tabs
-        const cur = ed.activeRelPath
+        const cur = ed.activeKey
         if (tabs.length < 2 || !cur) return
-        const idx = tabs.findIndex((t) => t.relPath === cur)
+        const idx = tabs.findIndex((t) => t.key === cur)
         const next = e.shiftKey ? (idx - 1 + tabs.length) % tabs.length : (idx + 1) % tabs.length
-        ed.activateTab(tabs[next].relPath)
+        ed.activateTab(tabs[next].key)
         return
       }
       if (mod && !e.shiftKey && (e.key === 'w' || e.key === 'W')) {

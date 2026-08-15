@@ -126,6 +126,18 @@ button {
   color: var(--color-text);
   background: var(--color-bg-subtle);
 }
+/* CC-3 终端 Tab 视觉区分（设计 D5）：图标着色 + 左侧色条，与文件 Tab 区分 */
+.tabbar__icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+.tabbar__tab--terminal {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.tabbar__tab--terminal .tabbar__name {
+  font-family: var(--font-mono);
+  font-size: calc(var(--font-size-base) - 1px);
+}
 
 /* ============ 主区编辑器（阶段 3） ============ */
 
@@ -1027,6 +1039,22 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+/* CC-3 占位态：重启恢复的终端 Tab（进程已随上次退出关闭；重开按钮 CC-4 落地） */
+.terminal--placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+.terminal--placeholder-title {
+  font-size: var(--font-size-base);
+}
+.terminal--placeholder-hint {
+  font-size: calc(var(--font-size-base) - 1px);
+  color: var(--color-text-tertiary);
 }
 
 /* 浮层面板：默认移出视口，显示时滑入（不挤压主区布局） */

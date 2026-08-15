@@ -428,6 +428,20 @@ export default function Sidebar({
     }
   }
 
+  /** CC-3 最小入口：在此打开 Claude Code 终端（设计 D2 顶层与任意分层文件夹右键；
+      完整入口 CC-5 升级为设置开关控制 + CLI 未装置灰）。失败经 setListError 提示。 */
+  async function openTerminal(node) {
+    setContextMenu(null)
+    const cwdRelPath = node ? node.relPath : '.'
+    const title = node ? node.name : '根目录'
+    const r = await editor.openTerminalTab({ cwdRelPath, title })
+    if (!r.ok) {
+      setListError(
+        r.reason === 'cli-missing' ? '未检测到 Claude Code CLI，无法打开终端' : String(r.reason ?? '终端打开失败')
+      )
+    }
+  }
+
   /** 开始重命名（4.3）：节点行转内联输入 */
   function startRename(node) {
     setContextMenu(null)
@@ -674,6 +688,7 @@ export default function Sidebar({
             openMenu(e, [
               { label: '新建文件', onClick: () => startCreateFile('') },
               { label: '新建文件夹', onClick: () => startCreate('', 'folder') },
+              { label: '在此打开 Claude Code 终端', onClick: () => openTerminal(null) }, // CC-3
               { label: '在资源管理器中打开', onClick: () => revealInExplorer(null) },
               { label: '刷新', onClick: () => refreshTree() } // 4.5：感知外部改动
             ])
@@ -728,6 +743,7 @@ export default function Sidebar({
                             label: '新建文件夹',
                             onClick: () => startCreate(node.relPath, 'folder')
                           },
+                          { label: '在此打开 Claude Code 终端', onClick: () => openTerminal(node) }, // CC-3
                           { label: '在资源管理器中打开', onClick: () => revealInExplorer(node) },
                           { label: '重命名', onClick: () => startRename(node) },
                           { label: '删除', danger: true, onClick: () => startDelete(node) },

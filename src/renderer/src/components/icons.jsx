@@ -51,6 +51,16 @@ export function CloseIcon(props) {
   )
 }
 
+/** 终端（>_ 提示符框）——终端 Tab 图标（CC-3，设计 §3.2 视觉区分 D5） */
+export function TerminalIcon(props) {
+  return (
+    <Svg {...props}>
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </Svg>
+  )
+}
+
 /** 收缩（四角向内）——退出专注按钮（替代文本字符 ⤢） */
 export function MinimizeIcon(props) {
   return (

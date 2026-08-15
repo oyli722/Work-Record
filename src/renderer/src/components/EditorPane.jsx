@@ -9,6 +9,7 @@ import PreviewPane from './PreviewPane'
 import ConfirmDialog from './ConfirmDialog'
 import DiffView from './DiffView'
 import TabBar, { fileNameOf } from './TabBar'
+import TerminalPane from './TerminalPane'
 import { ExpandIcon } from './icons'
 
 const MIN_RATIO = 15
@@ -21,7 +22,9 @@ function dirOf(relPath) {
 }
 
 export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef }) {
-  const { currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
+  const { activeTab, currentFile, content, saveState, dirty, error, loading, setContent, save, externalChange } = editor
+  // CC-3：终端 Tab 占满主内容区（D4），file 语义状态（content/saveState 等）终端下为空
+  const isTerminal = activeTab?.type === 'terminal'
   const isMarkdown = /\.md$/i.test(currentFile ?? '') // TXT 预览退化为纯文本
   // 相对图片基准目录：当前文件所在目录（工作区内，PRD §4.4.2）
   const baseDir = dirOf(currentFile ?? '')
@@ -51,43 +54,43 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
     setCloseQueue([currentFile]) // 复用 7.2 关闭流程（含未保存三选）
   }
 
-  /** 9.2.2 批量关闭入口：已保存直接关；未保存逐个入队三选 */
-  function startBatchClose(relPaths) {
+  /** 9.2.2 批量关闭入口：已保存直接关；未保存逐个入队三选（CC-3 按 key 寻址；terminal 无未保存直接关 D7） */
+  function startBatchClose(keys) {
     const dirty = []
-    for (const p of relPaths) {
-      const { needsConfirm } = editor.closeTab(p)
-      if (needsConfirm) dirty.push(p)
-      else editor.confirmCloseTab(p)
+    for (const key of keys) {
+      const { needsConfirm } = editor.closeTab(key)
+      if (needsConfirm) dirty.push(key)
+      else editor.confirmCloseTab(key)
     }
     if (dirty.length > 0) setCloseQueue((q) => [...q, ...dirty])
   }
 
   async function handleCloseSave() {
-    const relPath = closeTarget
-    editor.activateTab(relPath)
+    const key = closeTarget
+    editor.activateTab(key)
     const r = await save()
     if (r.ok) {
-      editor.confirmCloseTab(relPath)
-      setCloseQueue((q) => q.filter((x) => x !== relPath))
+      editor.confirmCloseTab(key)
+      setCloseQueue((q) => q.filter((x) => x !== key))
     } else if (r.externalChange) {
-      setCloseExternalConfirm(relPath) // 覆盖确认期间队列保持，不弹下一个
+      setCloseExternalConfirm(key) // 覆盖确认期间队列保持，不弹下一个
     } else {
       setCloseQueue([]) // 保存失败：中止批量，保留现场
     }
   }
   function handleCloseDiscard() {
-    const relPath = closeTarget
-    editor.confirmCloseTab(relPath) // 放弃：丢弃未保存内容，无需写盘检测
-    setCloseQueue((q) => q.filter((x) => x !== relPath))
+    const key = closeTarget
+    editor.confirmCloseTab(key) // 放弃：丢弃未保存内容，无需写盘检测
+    setCloseQueue((q) => q.filter((x) => x !== key))
   }
   async function handleCloseOverwrite() {
-    const relPath = closeExternalConfirm
+    const key = closeExternalConfirm
     setCloseExternalConfirm(null)
-    editor.activateTab(relPath)
+    editor.activateTab(key)
     const r = await save(true) // 用户确认覆盖外部改动（PRD §4.3.6）
     if (r.ok) {
-      editor.confirmCloseTab(relPath)
-      setCloseQueue((q) => q.filter((x) => x !== relPath))
+      editor.confirmCloseTab(key)
+      setCloseQueue((q) => q.filter((x) => x !== key))
     }
   }
 
@@ -225,12 +228,43 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
           leftLabel={compare.leftLabel}
           rightLabel={compare.rightLabel}
         />
+      ) : isTerminal ? (
+        <>
+          {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
+          <TabBar
+            editor={editor}
+            onCloseRequest={(key) => setCloseQueue([key])}
+            onBatchClose={startBatchClose}
+          />
+          {/* CC-3 终端 Tab 占满主内容区（D4）：隐藏三态按钮 + 保存区（终端无保存语义），保留标题 + 专注入口 */}
+          <div className="editor__bar">
+            <span className="editor__file" title={`${activeTab.title}（${activeTab.cwdRelPath}）`}>
+              {activeTab.title} — 终端
+            </span>
+            <button
+              type="button"
+              className="editor__focus"
+              onClick={onToggleFocus}
+              title="专注模式 (F11)"
+              aria-label="专注模式"
+            >
+              <ExpandIcon width={16} height={16} />
+            </button>
+          </div>
+          <div className="editor__body editor__body--terminal">
+            <TerminalPane
+              termId={activeTab.termId}
+              title={activeTab.title}
+              cwdRelPath={activeTab.cwdRelPath}
+            />
+          </div>
+        </>
       ) : currentFile ? (
         <>
           {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
           <TabBar
             editor={editor}
-            onCloseRequest={(relPath) => setCloseQueue([relPath])}
+            onCloseRequest={(key) => setCloseQueue([key])}
             onBatchClose={startBatchClose}
           />
           <div className="editor__bar">
