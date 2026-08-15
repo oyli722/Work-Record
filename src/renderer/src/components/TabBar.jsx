@@ -68,69 +68,90 @@ export default function TabBar({ editor, onCloseRequest, onBatchClose }) {
     setMenu({ x: e.clientX, y: e.clientY, key })
   }
 
-  const idx = menu ? tabs.findIndex((t) => t.key === menu.key) : -1
+  // CC-4 分组（用户定案）：终端 Tab 与文件 Tab 分离——终端组固定在最左侧、文件组在其右侧，
+  // 组间分隔线，避免混排混乱；点击任意 Tab 即跳转（激活切换）。
+  const terminalTabs = tabs.filter((t) => t.type === 'terminal')
+  const fileTabs = tabs.filter((t) => t.type === 'file')
+  // 显示顺序（批量关闭的左右语义也按此顺序）
+  const orderedTabs = [...terminalTabs, ...fileTabs]
+  const idx = menu ? orderedTabs.findIndex((t) => t.key === menu.key) : -1
   const menuItems = menu
     ? [
         { label: '关闭此标签', onClick: () => onBatchClose([menu.key]) },
         {
           label: '关闭其他标签',
-          onClick: () => onBatchClose(tabs.filter((t) => t.key !== menu.key).map((t) => t.key)),
-          disabled: tabs.length <= 1
+          onClick: () => onBatchClose(orderedTabs.filter((t) => t.key !== menu.key).map((t) => t.key)),
+          disabled: orderedTabs.length <= 1
         },
         {
           label: '关闭左侧标签',
-          onClick: () => onBatchClose(tabs.filter((_, i) => i < idx).map((t) => t.key)),
+          onClick: () => onBatchClose(orderedTabs.filter((_, i) => i < idx).map((t) => t.key)),
           disabled: idx <= 0
         },
         {
           label: '关闭右侧标签',
-          onClick: () => onBatchClose(tabs.filter((_, i) => i > idx).map((t) => t.key)),
-          disabled: idx >= tabs.length - 1
+          onClick: () => onBatchClose(orderedTabs.filter((_, i) => i > idx).map((t) => t.key)),
+          disabled: idx >= orderedTabs.length - 1
         },
-        { label: '全部关闭', onClick: () => onBatchClose(tabs.map((t) => t.key)) }
+        { label: '全部关闭', onClick: () => onBatchClose(orderedTabs.map((t) => t.key)) }
       ]
     : []
+
+  /** 单个 Tab 渲染（文件/终端统一，终端带图标 + 区分样式；CC-3 起按 key 寻址） */
+  function renderTab(tab) {
+    const active = tab.key === activeKey
+    const dirty = tab.type === 'file' && tab.saveState === 'dirty'
+    const isTerminal = tab.type === 'terminal'
+    return (
+      <div
+        key={tab.key}
+        role="tab"
+        aria-selected={active}
+        ref={(el) => {
+          if (el) tabRefs.current.set(tab.key, el)
+          else tabRefs.current.delete(tab.key)
+        }}
+        className={`tabbar__tab${active ? ' tabbar__tab--active' : ''}${
+          isTerminal ? ' tabbar__tab--terminal' : ''
+        }`}
+        onClick={() => activateTab(tab.key)}
+        onContextMenu={(e) => openMenu(e, tab.key)}
+        title={isTerminal ? `${tab.title} — 终端（${tab.cwdRelPath}）` : tab.relPath}
+      >
+        {isTerminal && <TerminalIcon width={14} height={14} className="tabbar__icon" />}
+        <span className="tabbar__name">
+          {tabLabel(tab)}
+          {dirty && <span className="tabbar__dirty" aria-label="未保存" />}
+        </span>
+        <button
+          type="button"
+          className="tabbar__close"
+          onClick={(e) => handleClose(e, tab.key)}
+          aria-label="关闭标签"
+          title="关闭"
+        >
+          <CloseIcon width={12} height={12} />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <>
       <div className="tabbar" role="tablist" ref={tabbarRef}>
-        {tabs.map((tab) => {
-          const active = tab.key === activeKey
-          const dirty = tab.type === 'file' && tab.saveState === 'dirty'
-          const isTerminal = tab.type === 'terminal'
-          return (
-            <div
-              key={tab.key}
-              role="tab"
-              aria-selected={active}
-              ref={(el) => {
-                if (el) tabRefs.current.set(tab.key, el)
-                else tabRefs.current.delete(tab.key)
-              }}
-              className={`tabbar__tab${active ? ' tabbar__tab--active' : ''}${
-                isTerminal ? ' tabbar__tab--terminal' : ''
-              }`}
-              onClick={() => activateTab(tab.key)}
-              onContextMenu={(e) => openMenu(e, tab.key)}
-              title={isTerminal ? `${tab.title} — 终端（${tab.cwdRelPath}）` : tab.relPath}
-            >
-              {isTerminal && <TerminalIcon width={14} height={14} className="tabbar__icon" />}
-              <span className="tabbar__name">
-                {tabLabel(tab)}
-                {dirty && <span className="tabbar__dirty" aria-label="未保存" />}
-              </span>
-              <button
-                type="button"
-                className="tabbar__close"
-                onClick={(e) => handleClose(e, tab.key)}
-                aria-label="关闭标签"
-                title="关闭"
-              >
-                <CloseIcon width={12} height={12} />
-              </button>
-            </div>
-          )
-        })}
+        {terminalTabs.length > 0 && (
+          <div className="tabbar__group tabbar__group--terminal" role="presentation">
+            {terminalTabs.map(renderTab)}
+          </div>
+        )}
+        {terminalTabs.length > 0 && fileTabs.length > 0 && (
+          <div className="tabbar__group-sep" role="presentation" aria-hidden="true" />
+        )}
+        {fileTabs.length > 0 && (
+          <div className="tabbar__group tabbar__group--file" role="presentation">
+            {fileTabs.map(renderTab)}
+          </div>
+        )}
       </div>
 
       {/* 9.2.2 标签右键菜单（关闭/关闭其他/关闭左侧/关闭右侧/全部关闭） */}

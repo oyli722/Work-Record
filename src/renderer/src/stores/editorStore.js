@@ -65,10 +65,11 @@ function createTab(relPath, content) {
   }
 }
 
-/** terminal tab 工厂（设计 §3.1）：termId 为 null 表示占位（重启恢复，进程已随上次退出关闭） */
-function createTerminalTab({ termId, cwdRelPath, title, exited = false }) {
+/** terminal tab 工厂（设计 §3.1）：termId 为 null 表示占位（重启恢复，进程已随上次退出关闭）；
+    exited 标记进程已退出（CC-4 退出占位态），exitCode 为退出码（可 null） */
+function createTerminalTab({ termId, cwdRelPath, title, exited = false, exitCode = null }) {
   const key = termId ? `terminal:${termId}` : `terminal:restore:${++restoreSeq}`
-  return { type: 'terminal', key, termId: termId ?? null, cwdRelPath, title, exited }
+  return { type: 'terminal', key, termId: termId ?? null, cwdRelPath, title, exited, exitCode }
 }
 
 export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DEFAULT_DELAY } = {}) {
@@ -223,6 +224,25 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
   const restoreTerminalTab = useCallback(({ cwdRelPath, title }) => {
     setTabs((ts) => [...ts, createTerminalTab({ termId: null, cwdRelPath, title, exited: true })])
     return { ok: true }
+  }, [])
+
+  /** 标记 terminal tab 进程已退出（CC-4 退出占位态；由 TerminalPane 的 term:exit 事件回调触发） */
+  const markTerminalExited = useCallback((key, exitCode) => {
+    updateTab(key, (t) => (t.type === 'terminal' ? { ...t, exited: true, exitCode: exitCode ?? null } : t))
+  }, [])
+
+  /** 重开占位/退出 terminal tab（CC-4，设计 §3.6）：在原目录吊起全新 claude 会话（替换当前 tab，
+      不恢复旧会话；旧占位 tab 原地复活为新 termId 的 tab，持久化条目不变）。 */
+  const reopenTerminalTab = useCallback(async (key) => {
+    const tab = tabsRef.current.find((t) => t.key === key)
+    if (!tab || tab.type !== 'terminal') return { ok: false, reason: 'not-found' }
+    const r = await window.mework.term.create(tab.cwdRelPath)
+    if (!r.ok) return { ok: false, reason: r.reason }
+    const newTab = createTerminalTab({ termId: r.termId, cwdRelPath: tab.cwdRelPath, title: tab.title })
+    setTabs((ts) => ts.map((t) => (t.key === key ? newTab : t)))
+    activeRef.current = newTab.key
+    setActiveKey(newTab.key)
+    return { ok: true, termId: r.termId, key: newTab.key }
   }, [])
 
   /** 激活标签（同步 activeRef，供同一事件循环内 save 等读取；按 key） */
@@ -439,6 +459,8 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     openFile,
     openTerminalTab,
     restoreTerminalTab,
+    markTerminalExited,
+    reopenTerminalTab,
     activateTab,
     closeTab,
     confirmCloseTab,

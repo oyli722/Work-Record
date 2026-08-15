@@ -21,7 +21,7 @@ function dirOf(relPath) {
   return i === -1 ? '' : relPath.slice(0, i)
 }
 
-export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef }) {
+export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef, fontSize }) {
   const {
     activeTab,
     activeKey,
@@ -375,6 +375,12 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
                   title={tab.title}
                   cwdRelPath={tab.cwdRelPath}
                   active={tab.key === activeKey}
+                  theme={theme}
+                  fontSize={fontSize}
+                  exited={tab.exited}
+                  exitCode={tab.exitCode}
+                  onExit={(code) => editor.markTerminalExited(tab.key, code)}
+                  onReopen={() => editor.reopenTerminalTab(tab.key)}
                 />
               </div>
             ))}

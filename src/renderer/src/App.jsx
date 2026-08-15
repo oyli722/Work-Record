@@ -226,6 +226,7 @@ export default function App() {
               onToggleFocus={toggleFocus}
               compare={compare}
               shortcutActionsRef={shortcutActionsRef}
+              fontSize={settings.fontSize}
             />
           ) : isRestoring ? (
             <div className="app__status">

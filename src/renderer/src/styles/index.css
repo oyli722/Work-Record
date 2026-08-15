@@ -140,6 +140,19 @@ button {
   font-family: var(--font-mono);
   font-size: calc(var(--font-size-base) - 1px);
 }
+/* CC-4 Tab 分组（用户定案）：终端组固定最左侧、文件组右侧，组间分隔线——两类 Tab 分离避免混排混乱 */
+.tabbar__group {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-0);
+  min-width: 0;
+}
+.tabbar__group-sep {
+  flex-shrink: 0;
+  width: 1px;
+  margin: 6px var(--space-1);
+  background: var(--color-border-subtle);
+}
 
 /* ============ 主区编辑器（阶段 3） ============ */
 
@@ -1080,6 +1093,24 @@ html[data-theme='light'] .codemirror .cm-selectionMatch {
 .terminal--placeholder-hint {
   font-size: calc(var(--font-size-base) - 1px);
   color: var(--color-text-tertiary);
+}
+/* CC-4 占位/退出态「重新打开」按钮（§3.5/§3.6） */
+.terminal__reopen {
+  margin-top: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.terminal__reopen:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 /* 浮层面板：默认移出视口，显示时滑入（不挤压主区布局） */

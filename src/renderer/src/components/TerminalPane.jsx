@@ -1,11 +1,16 @@
 // 终端面板（CC Console，设计文档 §3.3）
 // xterm.js 挂载 + 与主进程 pty 双向数据流：term:data → terminal.write；terminal.onData → term:write。
 // 常驻模型（D12）：TerminalPane 接收已创建的 termId（editorStore.openTerminalTab 经 term:create 取得），
-// 由 EditorPane 常驻挂载——Tab 切走仅 display:none 隐藏（xterm 不卸载、缓冲与滚动不丢），
+// 由 EditorPane 常驻挂载——Tab 切走仅 visibility 隐藏（xterm 不卸载、缓冲与滚动不丢），
 // 切回时经 active 触发 refit 恢复尺寸；卸载（关闭 Tab）时**不 kill**——终端进程生命周期 = Tab 生命周期，
 // kill 归 confirmCloseTab / 应用退出（D11/D12）。
-// termId 为 null 时渲染占位态（设计 §3.6 重启恢复：会话已随上次退出关闭；重开按钮 CC-4 落地）。
-// 主题跟随 / 退出占位态在 CC-4 完善，本组件已打通常驻缓冲与 Tab 生命周期驱动。
+//
+// CC-4 形态：
+// - 占位态（termId 为 null，重启恢复）：显示「会话已随上次退出关闭」+「在此目录重新打开」按钮（§3.6）
+// - 退出态（exited=true）：进程退出后显示「会话已结束（code=N）」+「重新打开」按钮（§3.5），xterm 卸载
+// - 主题配色：终端固定深色（2026-08-15 用户定案——claude/Shell ANSI 按深色设计，浅底会相反）；
+//   不再随 MeWork 明暗主题（theme prop 保留为扩展点，当前 xtermTheme() 恒为深色方案）
+// - 字号跟随编辑器字号（2026-08-15 定案）
 //
 // CC-3 缺陷修复记录（2026-08-15，详见《docs/CC终端集成-CC3布局缺陷排查记录.md》）：
 // - 缺陷一（非专注终端只占 60-70% 宽）：onResize 订阅必须先于首次 fit，否则初次 fit 的
@@ -19,27 +24,78 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
-export default function TerminalPane({ termId = null, title = '终端', cwdRelPath = '.', fontSize = 13, active = true }) {
-  // 占位态：termId 为 null（重启恢复的 terminal tab，进程已随上次退出关闭）
+/** xterm 主题（2026-08-15 用户定案）：终端**固定深色**配色，不随 MeWork 亮/暗主题——
+    claude/Shell 的 ANSI 配色按深色背景设计，浅底会「相反」；光标沿用 accent token。 */
+function xtermTheme() {
+  return {
+    background: '#1e1e1e', // 固定深色（VS Code 默认终端底色同款）
+    foreground: '#d4d4d4', // 固定浅色前景
+    cursor: '#0a84ff',
+    selectionBackground: '#3a3a3c'
+  }
+}
+
+export default function TerminalPane({
+  termId = null,
+  title = '终端',
+  cwdRelPath = '.',
+  fontSize = 13,
+  active = true,
+  theme = 'dark',
+  exited = false,
+  exitCode = null,
+  onExit,
+  onReopen
+}) {
+  // 重启恢复占位（termId 为 null，进程已随上次退出关闭）：提供「在此目录重新打开」（§3.6）
   if (!termId) {
     return (
       <div className="terminal terminal--placeholder">
         <p className="terminal__placeholder-title">终端会话已随上次退出关闭</p>
         <p className="terminal__placeholder-hint">
-          {title}（{cwdRelPath}）— 重新打开终端按钮将在后续版本提供
+          {title}（{cwdRelPath}）
         </p>
+        <button type="button" className="terminal__reopen" onClick={onReopen}>
+          在此目录重新打开
+        </button>
       </div>
     )
   }
 
-  return <LiveTerminal termId={termId} title={title} fontSize={fontSize} active={active} />
+  // 退出占位（进程已结束）：显示退出码 + 「重新打开」（§3.5）；xterm 随之卸载
+  if (exited) {
+    return (
+      <div className="terminal terminal--placeholder">
+        <p className="terminal__placeholder-title">会话已结束</p>
+        <p className="terminal__placeholder-hint">
+          {title}（{cwdRelPath}）— 退出码 {exitCode ?? '未知'}
+        </p>
+        <button type="button" className="terminal__reopen" onClick={onReopen}>
+          重新打开
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <LiveTerminal
+      termId={termId}
+      title={title}
+      fontSize={fontSize}
+      active={active}
+      theme={theme}
+      onExit={onExit}
+    />
+  )
 }
 
 /** 实时终端：常驻绑定 termId 数据流（EditorPane 挂载期间不卸载，缓冲保留） */
-function LiveTerminal({ termId, fontSize, active }) {
+function LiveTerminal({ termId, fontSize, active, theme, onExit }) {
   const containerRef = useRef(null)
+  const termRef = useRef(null)
   const fitRef = useRef(null)
 
+  // 挂载：创建 xterm + fit + 数据流 + 尺寸同步（含 CC-3 缺陷修复，见文件头注释）
   useEffect(() => {
     const container = containerRef.current
     if (!container) return undefined
@@ -48,11 +104,12 @@ function LiveTerminal({ termId, fontSize, active }) {
       cursorBlink: true,
       fontSize,
       fontFamily: 'Consolas, "Courier New", monospace',
-      theme: { background: '#1e1e1e', foreground: '#d4d4d4' } // CC-4 起跟随 MeWork 主题 token
+      theme: xtermTheme()
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(container)
+    termRef.current = term
 
     // 【CC-3 缺陷一修复】尺寸同步订阅必须先于首次 fit：初次 fit（默认 80 列 → 实际 cols）触发的
     // onResize 事件若丢失（订阅在后），pty 将停留在 spawn 初始 80×24 → claude 按 80 列渲染
@@ -133,13 +190,13 @@ function LiveTerminal({ termId, fontSize, active }) {
     container.addEventListener('compositionupdate', onComposition)
     container.addEventListener('compositionend', onComposition)
 
-    // 主进程 → 终端：pty 输出写入（按 termId 过滤；display:none 时组件仍挂载，输出照写缓冲）
+    // 主进程 → 终端：pty 输出写入（按 termId 过滤；隐藏时组件仍挂载，输出照写缓冲）
     const offData = window.mework.term.onData((id, chunk) => {
       if (id === termId) term.write(chunk)
     })
-    // 主进程 → 终端：进程退出（CC-3 仅提示；CC-4 起落退出占位态）
+    // 主进程 → 终端：进程退出（CC-4 起落退出占位态：通知 store 标记 exited → 本组件重渲染为占位）
     const offExit = window.mework.term.onExit((id, code) => {
-      if (id === termId) term.write(`\r\n\x1b[90m[进程已退出，code=${code}]\x1b[0m\r\n`)
+      if (id === termId) onExit?.(code)
     })
     // 终端 → 主进程：键盘输入直达 pty
     const dataDisposable = term.onData((data) => {
@@ -151,6 +208,7 @@ function LiveTerminal({ termId, fontSize, active }) {
     return () => {
       disposed = true
       stopClamp()
+      termRef.current = null
       fitRef.current = null
       fitObserver.disconnect()
       container.removeEventListener('compositionstart', onComposition)
@@ -163,10 +221,31 @@ function LiveTerminal({ termId, fontSize, active }) {
       term.dispose()
       // 不 kill：进程生命周期 = Tab 生命周期，kill 归 confirmCloseTab / 应用退出（D11/D12）
     }
-  }, [termId, fontSize])
+  }, [termId, fontSize]) // eslint-disable-line react-hooks/exhaustive-deps -- onExit 经闭包由 EditorPane 每渲染更新，见 EditorPane 传参
 
-  // 激活变化（切回）：容器从 display:none 恢复实际尺寸后 refit。
-  // 多重时序兜底（display 恢复 → 布局稳定 → 渲染服务/字符测量就绪）：
+  // 主题扩展点：当前固定深色（用户定案），theme 变化时重应用 xtermTheme()（恒为深色方案，
+  // 保留此 effect 以便未来支持终端配色可配置时直接接入）
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    term.options.theme = xtermTheme()
+  }, [theme])
+
+  // CC-4 字号跟随编辑器字号：更新字号 → 重新测量字符 + fit + 同步 pty
+  useEffect(() => {
+    const term = termRef.current
+    if (!term) return
+    term.options.fontSize = fontSize
+    try {
+      fitRef.current?.fit()
+    } catch {
+      /* 忽略 */
+    }
+    window.mework.term.resize(termId, term.cols, term.rows)
+  }, [fontSize, termId])
+
+  // 激活变化（切回）：容器从 visibility 隐藏恢复实际尺寸后 refit。
+  // 多重时序兜底（visibility 恢复 → 布局稳定 → 渲染服务/字符测量就绪）：
   // 单次 fit 若在过渡态执行会拿到偏小的容器宽度，导致 cols 偏小、内容左移 + 右侧空白。
   useEffect(() => {
     if (!active) return
@@ -180,7 +259,7 @@ function LiveTerminal({ termId, fontSize, active }) {
             /* 忽略：等待下一时序 */
           }
           // 兜底同步：fit 后 pty 尺寸与 xterm 一致（切回时容器尺寸可能已变化）
-          const term = fitRef.current?._terminal ?? null
+          const term = termRef.current
           if (term) window.mework.term.resize(termId, term.cols, term.rows)
         }
       }, t)
