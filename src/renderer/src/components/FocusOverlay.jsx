@@ -34,7 +34,6 @@ export default function FocusOverlay({
   editor,
   onExitFocus,
   fileTree,
-  shortcutActionsRef,
   terminalMenuEnabled
 }) {
   const [showTop, topEnter, topLeave] = useHover()
@@ -74,7 +73,6 @@ export default function FocusOverlay({
           workspace={workspace}
           editor={editor}
           fileTree={fileTree}
-          shortcutActionsRef={shortcutActionsRef}
           terminalMenuEnabled={terminalMenuEnabled}
         />
       </div>

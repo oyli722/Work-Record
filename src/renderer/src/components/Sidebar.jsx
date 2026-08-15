@@ -15,13 +15,14 @@ import NewFileModal from './NewFileModal'
 import VersionPanel from './VersionPanel'
 import { CloseIcon } from './icons'
 import { dirOf, fileNameOf } from '../utils/path'
+import { registerAction, unregisterAction } from '../stores/actionRegistry'
 
 // 8.3 侧边栏拖拽调宽：宽度范围 + 默认（--sidebar-width 驱动 grid 列）
 const SIDEBAR_MIN = 160
 const SIDEBAR_MAX = 400
 const SIDEBAR_DEFAULT = 240
 
-export default function Sidebar({ workspace, editor, fileTree, onCompareChange, shortcutActionsRef, terminalMenuEnabled }) {
+export default function Sidebar({ workspace, editor, fileTree, onCompareChange, terminalMenuEnabled }) {
   // fileTree（useFileTree，App 持有）：树数据与操作。3.8 评审 P1 状态提升——
   // 专注模式主/浮层 Sidebar 共享同一实例，进出专注不丢失。
   const {
@@ -134,23 +135,30 @@ export default function Sidebar({ workspace, editor, fileTree, onCompareChange, 
   const [newFileModal, setNewFileModal] = useState(null) // 新建文件弹窗（9.2.8：{ relPath, name }）
   const [switchConfirm, setSwitchConfirm] = useState(null) // 切换工作区外部改动覆盖确认（P1）
 
-  // 9.2.6 快捷键动作注册（App 全局 keydown 分发；渲染期赋值保证闭包最新，同 onChangeRef 惯例）。
-  // 目标为工作区根 / 当前打开文件；新建/重命名均需工作区激活。
-  shortcutActionsRef.current.newFile = () => {
-    if (workspace.state !== 'active') return
-    startCreateFile('')
-  }
-  shortcutActionsRef.current.newFolder = () => {
-    if (workspace.state !== 'active') return
-    startCreate('', 'folder')
-  }
-  shortcutActionsRef.current.renameActive = () => {
-    const relPath = editor.currentFile
-    if (!relPath || workspace.state !== 'active') return
-    const name = fileNameOf(relPath)
-    setListOpen(true) // 树收起时先展开列表，保证重命名输入可见
-    startRename({ relPath, name, isDir: false })
-  }
+  // 9.2.6 快捷键动作注册（OPT-3b：actionRegistry；useEffect 无依赖数组 → 每次渲染
+  // 重新注册持最新闭包，卸载自动注销；目标为工作区根 / 当前打开文件，新建/重命名需工作区激活）
+  useEffect(() => {
+    registerAction('newFile', () => {
+      if (workspace.state !== 'active') return
+      startCreateFile('')
+    })
+    registerAction('newFolder', () => {
+      if (workspace.state !== 'active') return
+      startCreate('', 'folder')
+    })
+    registerAction('renameActive', () => {
+      const relPath = editor.currentFile
+      if (!relPath || workspace.state !== 'active') return
+      const name = fileNameOf(relPath)
+      setListOpen(true) // 树收起时先展开列表，保证重命名输入可见
+      startRename({ relPath, name, isDir: false })
+    })
+    return () => {
+      unregisterAction('newFile')
+      unregisterAction('newFolder')
+      unregisterAction('renameActive')
+    }
+  })
 
   async function handleSwitch(absPath) {
     setMenuOpen(false)

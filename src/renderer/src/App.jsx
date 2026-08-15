@@ -5,6 +5,7 @@ import useFontSettings, { FONT_STACKS } from './hooks/useFontSettings'
 import useFileTree from './hooks/useFileTree'
 import useWorkspace from './stores/workspaceStore'
 import useEditor from './stores/editorStore'
+import { getAction } from './stores/actionRegistry'
 import { readOpenTabs, removeOpenTabs } from './stores/openTabsStorage'
 import WorkspaceEmpty from './components/WorkspaceEmpty'
 import TopBar from './components/TopBar'
@@ -31,9 +32,8 @@ export default function App() {
     autosaveEnabled: settings.autosaveEnabled,
     autosaveDelayMs: settings.autosaveDelayMs
   })
-  // 9.2.6 全局快捷键（PRD §8.2 开放项 5）：动作注册表由 Sidebar/EditorPane 渲染期赋值，
-  // App 全局 keydown 分发（渲染期赋值保证闭包最新，同 onChangeRef 惯例）
-  const shortcutActionsRef = useRef({})
+  // 9.2.6 全局快捷键（PRD §8.2 开放项 5）：动作注册表由 Sidebar/EditorPane 经 actionRegistry
+  // 注册（OPT-3b：每次渲染重注册持最新闭包、卸载自动注销），App 全局 keydown 只读分发
   const editorRef = useRef(editor)
   editorRef.current = editor
   const [focus, setFocus] = useState(false)
@@ -137,7 +137,6 @@ export default function App() {
       // D10 快捷键让渡：终端 Tab 激活时全部键盘输入（含 Ctrl+S/W/N、Ctrl+Tab 等）直达 pty，
       // MeWork 全局快捷键不拦截（关闭靠 ✕ / 右键）
       if (ed.activeTab?.type === 'terminal') return
-      const a = shortcutActionsRef.current
       const mod = e.ctrlKey && !e.altKey
       if (mod && e.key === 'Tab') {
         e.preventDefault()
@@ -151,22 +150,22 @@ export default function App() {
       }
       if (mod && !e.shiftKey && (e.key === 'w' || e.key === 'W')) {
         e.preventDefault()
-        a.closeTab?.()
+        getAction('closeTab')?.()
         return
       }
       if (mod && !e.shiftKey && e.key === '\\') {
         e.preventDefault()
-        a.cycleMode?.()
+        getAction('cycleMode')?.()
         return
       }
       if (mod && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
-        a.newFolder?.()
+        getAction('newFolder')?.()
         return
       }
       if (mod && !e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
-        a.newFile?.()
+        getAction('newFile')?.()
         return
       }
       if (e.key === 'F2') {
@@ -174,7 +173,7 @@ export default function App() {
         const ae = document.activeElement
         if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return
         e.preventDefault()
-        a.renameActive?.()
+        getAction('renameActive')?.()
         return
       }
     }
@@ -203,7 +202,6 @@ export default function App() {
             editor={editor}
             fileTree={fileTree}
             onCompareChange={setCompare}
-            shortcutActionsRef={shortcutActionsRef}
             terminalMenuEnabled={settings.terminalMenuEnabled}
           />
         )}
@@ -214,7 +212,6 @@ export default function App() {
               theme={theme}
               onToggleFocus={toggleFocus}
               compare={compare}
-              shortcutActionsRef={shortcutActionsRef}
               fontSize={settings.fontSize}
             />
           ) : isRestoring ? (
@@ -234,7 +231,6 @@ export default function App() {
           editor={editor}
           onExitFocus={() => setFocus(false)}
           fileTree={fileTree}
-          shortcutActionsRef={shortcutActionsRef}
           terminalMenuEnabled={settings.terminalMenuEnabled}
         />
       )}

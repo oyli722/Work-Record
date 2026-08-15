@@ -13,11 +13,12 @@ import TerminalPane from './TerminalPane'
 import { ExpandIcon } from './icons'
 import { dirOf, fileNameOf } from '../utils/path'
 import { isMarkdownFile } from '../../../shared/format-registry'
+import { registerAction, unregisterAction } from '../stores/actionRegistry'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
 
-export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef, fontSize }) {
+export default function EditorPane({ editor, theme, onToggleFocus, compare, fontSize }) {
   const {
     activeTab,
     activeKey,
@@ -57,13 +58,20 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
   const [closeExternalConfirm, setCloseExternalConfirm] = useState(null) // 覆盖确认（关闭流程）
   const closeTarget = closeQueue[0] ?? null
 
-  // 9.2.6 快捷键动作注册（App 全局 keydown 分发；渲染期赋值保证闭包最新，同 onChangeRef 惯例）
-  shortcutActionsRef.current.cycleMode = () =>
-    setMode((m) => (m === 'split' ? 'edit' : m === 'edit' ? 'preview' : 'split'))
-  shortcutActionsRef.current.closeTab = () => {
-    if (!currentFile) return
-    setCloseQueue([currentFile]) // 复用 7.2 关闭流程（含未保存三选）
-  }
+  // 9.2.6 快捷键动作注册（OPT-3b：actionRegistry；useEffect 无依赖数组 → 每次渲染重注册持最新闭包）
+  useEffect(() => {
+    registerAction('cycleMode', () =>
+      setMode((m) => (m === 'split' ? 'edit' : m === 'edit' ? 'preview' : 'split'))
+    )
+    registerAction('closeTab', () => {
+      if (!currentFile) return
+      setCloseQueue([currentFile]) // 复用 7.2 关闭流程（含未保存三选）
+    })
+    return () => {
+      unregisterAction('cycleMode')
+      unregisterAction('closeTab')
+    }
+  })
 
   /** 9.2.2 批量关闭入口：已保存直接关；未保存逐个入队三选（CC-3 按 key 寻址；terminal 无未保存直接关 D7） */
   function startBatchClose(keys) {
