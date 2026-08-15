@@ -243,7 +243,7 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
           leftLabel={compare.leftLabel}
           rightLabel={compare.rightLabel}
         />
-      ) : isTerminal ? (
+      ) : isTerminal || currentFile ? (
         <>
           {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
           <TabBar
@@ -251,116 +251,128 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
             onCloseRequest={(key) => setCloseQueue([key])}
             onBatchClose={startBatchClose}
           />
-          {/* CC-3 终端 Tab 占满主内容区（D4）：隐藏三态按钮 + 保存区（终端无保存语义），保留标题 + 专注入口。
-              终端面板本体在下方针常驻渲染（D12），此处仅工具条 */}
-          <div className="editor__bar">
-            <span className="editor__file" title={`${activeTab.title}（${activeTab.cwdRelPath}）`}>
-              {activeTab.title} — 终端
-            </span>
-            <button
-              type="button"
-              className="editor__focus"
-              onClick={onToggleFocus}
-              title="专注模式 (F11)"
-              aria-label="专注模式"
-            >
-              <ExpandIcon width={16} height={16} />
-            </button>
-          </div>
-        </>
-      ) : currentFile ? (
-        <>
-          {/* 7.2 标签栏（编辑器上方一行；对比模式不显示） */}
-          <TabBar
-            editor={editor}
-            onCloseRequest={(key) => setCloseQueue([key])}
-            onBatchClose={startBatchClose}
-          />
-          <div className="editor__bar">
-            <span className="editor__file" title={currentFile}>
-              {currentFile}
-            </span>
-            <div className="editor__modes" role="group" aria-label="编辑器模式">
-              {modeBtn('split', '分屏')}
-              {modeBtn('edit', '编辑')}
-              {modeBtn('preview', '预览')}
-            </div>
-            {/* 3.8 专注模式入口：分屏切换旁（focus 时 editor__bar 整体隐藏） */}
-            <button
-              type="button"
-              className="editor__focus"
-              onClick={onToggleFocus}
-              title="专注模式 (F11)"
-              aria-label="专注模式"
-            >
-              <ExpandIcon width={16} height={16} />
-            </button>
-            <span
-              className={`editor__status${dirty ? ' editor__status--dirty' : ''}${
-                externalChange ? ' editor__status--conflict' : ''
-              }`}
-              title={
-                externalChange
-                  ? '磁盘文件已被外部修改，保存被阻止；Ctrl+S 或保存按钮可确认覆盖'
-                  : undefined
-              }
-            >
-              {saveState === 'saving'
-                ? '保存中…'
-                : externalChange
-                  ? '磁盘已变更·保存被阻止'
-                  : dirty
-                    ? '未保存'
-                    : '已保存'}
-            </span>
-            <button
-              type="button"
-              className="editor__save"
-              onClick={handleSave}
-              disabled={saveState === 'saving' || !dirty}
-            >
-              保存
-            </button>
-          </div>
 
-          <div className="editor__body" ref={bodyRef}>
-            {/* 9.2.7 编辑区常驻挂载：三态切换不卸载，保留光标/滚动；preview 模式 CSS 隐藏 */}
-            <div
-              className={`editor__pane editor__pane--edit${mode === 'preview' ? ' editor__pane--hidden' : ''}`}
-              style={mode === 'split' ? { flex: `0 0 ${ratio}%` } : { flex: '1 1 100%' }}
-            >
-              <CodeMirrorEditor
-                ref={editorScrollRef}
-                value={content}
-                onChange={setContent}
-                theme={theme}
-                baseDir={baseDir}
-                onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
-                onCursorLineChange={mode === 'split' ? handleEditorCursorLine : undefined}
-              />
+          {/* 活动工具条：terminal 隐藏三态按钮 + 保存区（D4），保留标题 + 专注入口；file 保持现状 */}
+          {isTerminal ? (
+            <div className="editor__bar">
+              <span className="editor__file" title={`${activeTab.title}（${activeTab.cwdRelPath}）`}>
+                {activeTab.title} — 终端
+              </span>
+              <button
+                type="button"
+                className="editor__focus"
+                onClick={onToggleFocus}
+                title="专注模式 (F11)"
+                aria-label="专注模式"
+              >
+                <ExpandIcon width={16} height={16} />
+              </button>
             </div>
-            {mode === 'split' && (
-              <div
-                className="editor__divider"
-                onMouseDown={onDividerDown}
-                role="separator"
-                aria-orientation="vertical"
-                title="拖拽调整分屏比例"
-              />
+          ) : (
+            <div className="editor__bar">
+              <span className="editor__file" title={currentFile}>
+                {currentFile}
+              </span>
+              <div className="editor__modes" role="group" aria-label="编辑器模式">
+                {modeBtn('split', '分屏')}
+                {modeBtn('edit', '编辑')}
+                {modeBtn('preview', '预览')}
+              </div>
+              {/* 3.8 专注模式入口：分屏切换旁（focus 时 editor__bar 整体隐藏） */}
+              <button
+                type="button"
+                className="editor__focus"
+                onClick={onToggleFocus}
+                title="专注模式 (F11)"
+                aria-label="专注模式"
+              >
+                <ExpandIcon width={16} height={16} />
+              </button>
+              <span
+                className={`editor__status${dirty ? ' editor__status--dirty' : ''}${
+                  externalChange ? ' editor__status--conflict' : ''
+                }`}
+                title={
+                  externalChange
+                    ? '磁盘文件已被外部修改，保存被阻止；Ctrl+S 或保存按钮可确认覆盖'
+                    : undefined
+                }
+              >
+                {saveState === 'saving'
+                  ? '保存中…'
+                  : externalChange
+                    ? '磁盘已变更·保存被阻止'
+                    : dirty
+                      ? '未保存'
+                      : '已保存'}
+              </span>
+              <button
+                type="button"
+                className="editor__save"
+                onClick={handleSave}
+                disabled={saveState === 'saving' || !dirty}
+              >
+                保存
+              </button>
+            </div>
+          )}
+
+          {/* 内容区 grid 层叠（CC-3 根治：终端 cell 尺寸恒常、xterm 渲染服务不失效，
+              fit 不受切换时序影响——一并消除「切回灰屏 / 长文本左移 / 非专注不占满」；
+              file 内容在 terminal 激活时卸载，terminal 面板常驻以 visibility 切换显隐（D12）） */}
+          <div className="editor__content">
+            {!isTerminal && currentFile && (
+              <div className="editor__content-cell editor__content-cell--file">
+                <div className="editor__body" ref={bodyRef}>
+                  {/* 9.2.7 编辑区常驻挂载：三态切换不卸载，保留光标/滚动；preview 模式 CSS 隐藏 */}
+                  <div
+                    className={`editor__pane editor__pane--edit${mode === 'preview' ? ' editor__pane--hidden' : ''}`}
+                    style={mode === 'split' ? { flex: `0 0 ${ratio}%` } : { flex: '1 1 100%' }}
+                  >
+                    <CodeMirrorEditor
+                      ref={editorScrollRef}
+                      value={content}
+                      onChange={setContent}
+                      theme={theme}
+                      baseDir={baseDir}
+                      onTopLineChange={mode === 'split' ? handleEditorTopLine : undefined}
+                      onCursorLineChange={mode === 'split' ? handleEditorCursorLine : undefined}
+                    />
+                  </div>
+                  {mode === 'split' && (
+                    <div
+                      className="editor__divider"
+                      onMouseDown={onDividerDown}
+                      role="separator"
+                      aria-orientation="vertical"
+                      title="拖拽调整分屏比例"
+                    />
+                  )}
+                  {/* 9.2.7 预览区常驻挂载：保留滚动位置；edit 模式 CSS 隐藏 */}
+                  <div
+                    className={`editor__pane editor__pane--preview${mode === 'edit' ? ' editor__pane--hidden' : ''}`}
+                    style={mode === 'preview' ? { flex: '1 1 100%' } : { flex: '1 1 0' }}
+                  >
+                    <PreviewPane
+                      ref={previewScrollRef}
+                      content={content}
+                      isMarkdown={isMarkdown}
+                      baseDir={baseDir}
+                      onTopLineChange={mode === 'split' ? handlePreviewTopLine : undefined}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
-            {/* 9.2.7 预览区常驻挂载：保留滚动位置；edit 模式 CSS 隐藏 */}
-            <div
-              className={`editor__pane editor__pane--preview${mode === 'edit' ? ' editor__pane--hidden' : ''}`}
-              style={mode === 'preview' ? { flex: '1 1 100%' } : { flex: '1 1 0' }}
-            >
-              <PreviewPane
-                ref={previewScrollRef}
-                content={content}
-                isMarkdown={isMarkdown}
-                baseDir={baseDir}
-                onTopLineChange={mode === 'split' ? handlePreviewTopLine : undefined}
-              />
-            </div>
+            {terminalTabs.map((tab) => (
+              <div
+                key={tab.key}
+                className="editor__content-cell"
+                style={{ visibility: tab.key === activeKey ? 'visible' : 'hidden' }}
+              >
+                <TerminalPane termId={tab.termId} title={tab.title} cwdRelPath={tab.cwdRelPath} />
+              </div>
+            ))}
           </div>
         </>
       ) : (
@@ -372,23 +384,6 @@ export default function EditorPane({ editor, theme, onToggleFocus, compare, shor
           )}
         </div>
       )}
-
-      {/* CC-3 常驻终端面板（D12）：全部 terminal tab 挂载不卸载，切走 display:none 保留缓冲；激活者显示并 refit */}
-      {!compare &&
-        terminalTabs.map((tab) => (
-          <div
-            key={tab.key}
-            className="editor__body editor__body--terminal"
-            style={{ display: tab.key === activeKey ? undefined : 'none' }}
-          >
-            <TerminalPane
-              termId={tab.termId}
-              title={tab.title}
-              cwdRelPath={tab.cwdRelPath}
-              active={tab.key === activeKey}
-            />
-          </div>
-        ))}
 
       {error && <p className="editor__error">{error}</p>}
 

@@ -42,6 +42,7 @@ button {
 .app__body {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 1fr; /* 显式单行：避免隐式行 auto 依赖内容导致 main 高度塌缩（CC-3 终端不占满根因） */
   min-height: 0;
   overflow: hidden;
 }
@@ -50,6 +51,7 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0; /* flex/grid 高度链保险：非专注时 main 高度 = 单元格，子项可收缩 */
   overflow: auto;
 }
 
@@ -243,6 +245,22 @@ button {
   flex: 1;
   display: flex;
   min-height: 0;
+}
+/* CC-3 内容区 grid 层叠：file 内容与全部终端面板同格层叠（cell 尺寸恒常 → xterm fit 稳定，
+   不受切换时序影响，根治「切回灰屏 / 长文本左移 / 非专注不占满」）；
+   非激活 cell visibility:hidden 隐藏但保持布局尺寸（D12 缓冲保留） */
+.editor__content {
+  flex: 1;
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  min-height: 0;
+}
+.editor__content-cell {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
 }
 
 .editor__pane {
