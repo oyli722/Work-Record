@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CloseIcon, TerminalIcon } from './icons'
 import ContextMenu from './ContextMenu'
+import { fileNameOf } from '../utils/path'
 
 // 标签栏（阶段 7.2，PRD §4.7.1/4.7.2；CC-3 Tab 模型扩展，设计文档 §3.1/§3.2）：编辑器上方一行
 // CC-3 起按 key 渲染（file tab key === relPath；terminal tab key === `terminal:${termId}`），
@@ -8,12 +9,6 @@ import ContextMenu from './ContextMenu'
 // 每标签：文件名 + ●未保存（仅 file）+ ✕ 关闭；活动标签高亮；点击切换。
 // 未保存关闭经 onCloseRequest 交由 EditorPane 弹三选（7.3）；terminal 关闭无未保存 → 直接确认关（D7）。
 // 9.2.2 右键菜单：关闭 / 关闭其他 / 关闭左侧 / 关闭右侧 / 全部关闭（未保存逐个三选，经 onBatchClose）。
-
-/** 相对路径取文件名 */
-export function fileNameOf(relPath) {
-  const i = relPath.lastIndexOf('/')
-  return i === -1 ? relPath : relPath.slice(i + 1)
-}
 
 /** 标签显示名：file 取文件名；terminal 取文件夹名（tab.title） */
 function tabLabel(tab) {

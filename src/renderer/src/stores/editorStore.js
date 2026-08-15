@@ -185,6 +185,10 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
             : t
         )
       )
+      // P2-3：加载期间标签可能已被用户关闭——已关闭则不再写回持久化列表（否则重启后该文件会「复活」）
+      if (!tabsRef.current.some((t) => t.type === 'file' && t.relPath === relPath)) {
+        return { ok: true }
+      }
       // 7.4 持久化打开列表（新标签，object 格式）
       try {
         const list = readOpenTabs()
@@ -213,7 +217,10 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
     setActiveKey(tab.key)
     try {
       const list = readOpenTabs()
-      localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...list, { type: 'terminal', cwdRelPath, title }]))
+      // P2-4：同一目录重复开终端不重复入持久化列表（否则重启恢复出多个占位 tab）
+      if (!list.some((it) => it.type === 'terminal' && it.cwdRelPath === cwdRelPath && it.title === title)) {
+        localStorage.setItem(OPEN_TABS_KEY, JSON.stringify([...list, { type: 'terminal', cwdRelPath, title }]))
+      }
     } catch {
       /* 静默 */
     }
@@ -333,13 +340,14 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
   )
 
   /** 保存全部未保存 file 标签（8.1 切换工作区前调用）。
-      遇外部改动（未 force）返回 externalChange，由调用方确认覆盖或中止（评审 P1）。 */
+      遇外部改动（未 force）返回 externalChange，由调用方确认覆盖或中止（评审 P1）；遇保存失败立即中止并返回错误，不静默吞错（P1 加固）。 */
   const saveAll = useCallback(
     async (force = false) => {
       for (const tab of tabsRef.current) {
         if (tab.type === 'file' && tab.content !== tab.savedContent) {
           const r = await doSave(tab.relPath, force, 'save')
           if (!force && r.externalChange) return { ok: false, externalChange: true }
+          if (!r.ok) return r
         }
       }
       return { ok: true }
@@ -382,6 +390,13 @@ export default function useEditor({ autosaveEnabled = true, autosaveDelayMs = DE
 
   /** 重命名后同步 file 标签路径（4.3）+ 持久化列表（7.4 评审 O2：旧路径 → 新路径） */
   const renameCurrentFile = useCallback((oldRelPath, newRelPath) => {
+    // P2-2：自动保存计时器以 relPath 为 key——随重命名迁移，避免旧路径的 pending 计时
+    // 到点触发 doSave(旧路径) 找不到标签而静默失效（重命名前刚编辑过即有 pending 计时）
+    const pendingTimer = autosaveTimersRef.current.get(oldRelPath)
+    if (pendingTimer) {
+      autosaveTimersRef.current.delete(oldRelPath)
+      autosaveTimersRef.current.set(newRelPath, pendingTimer)
+    }
     setTabs((ts) =>
       ts.map((t) => (t.type === 'file' && t.relPath === oldRelPath ? { ...t, relPath: newRelPath, key: newRelPath } : t))
     )

@@ -8,18 +8,13 @@ import CodeMirrorEditor from './CodeMirrorEditor'
 import PreviewPane from './PreviewPane'
 import ConfirmDialog from './ConfirmDialog'
 import DiffView from './DiffView'
-import TabBar, { fileNameOf } from './TabBar'
+import TabBar from './TabBar'
 import TerminalPane from './TerminalPane'
 import { ExpandIcon } from './icons'
+import { dirOf, fileNameOf } from '../utils/path'
 
 const MIN_RATIO = 15
 const MAX_RATIO = 85
-
-/** 相对路径的目录部分（工作区内，'/' 分隔） */
-function dirOf(relPath) {
-  const i = relPath.lastIndexOf('/')
-  return i === -1 ? '' : relPath.slice(0, i)
-}
 
 export default function EditorPane({ editor, theme, onToggleFocus, compare, shortcutActionsRef, fontSize }) {
   const {

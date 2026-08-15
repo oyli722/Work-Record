@@ -10,6 +10,7 @@ import ConfirmDialog from './ConfirmDialog'
 import NewFileModal from './NewFileModal'
 import VersionPanel from './VersionPanel'
 import { CloseIcon } from './icons'
+import { dirOf, fileNameOf } from '../utils/path'
 
 const DOC_EXT = /\.(md|txt)$/i
 // 9.2.8 目录树范围（用户定案：当前仅支持 无后缀 / .md / .txt）：
@@ -21,12 +22,6 @@ const isDocFile = (name) => DOC_EXT.test(name) || !name.includes('.') || name.st
 const SIDEBAR_MIN = 160
 const SIDEBAR_MAX = 400
 const SIDEBAR_DEFAULT = 240
-
-/** 相对路径的目录部分（工作区内，'/' 分隔） */
-function dirOf(relPath) {
-  const i = relPath.lastIndexOf('/')
-  return i === -1 ? '' : relPath.slice(0, i)
-}
 
 export default function Sidebar({
   workspace,
@@ -131,6 +126,7 @@ export default function Sidebar({
   const [deleteEmpty, setDeleteEmpty] = useState(true) // 删除目标是否为空文件夹（评审 S1）
   const [versionPanelFor, setVersionPanelFor] = useState(null) // 打开版本历史面板的文件（5.3）
   const [newFileModal, setNewFileModal] = useState(null) // 新建文件弹窗（9.2.8：{ relPath, name }）
+  const [switchConfirm, setSwitchConfirm] = useState(null) // 切换工作区外部改动覆盖确认（P1）
 
   // 9.2.6 快捷键动作注册（App 全局 keydown 分发；渲染期赋值保证闭包最新，同 onChangeRef 惯例）。
   // 目标为工作区根 / 当前打开文件；新建/重命名均需工作区激活。
@@ -145,7 +141,7 @@ export default function Sidebar({
   shortcutActionsRef.current.renameActive = () => {
     const relPath = editor.currentFile
     if (!relPath || workspace.state !== 'active') return
-    const name = relPath.slice(relPath.lastIndexOf('/') + 1)
+    const name = fileNameOf(relPath)
     setListOpen(true) // 树收起时先展开列表，保证重命名输入可见
     startRename({ relPath, name, isDir: false })
   }
@@ -166,14 +162,32 @@ export default function Sidebar({
 
   /**
    * 切换工作区。
-   * 未保存内容先保存；保存失败则中止切换、保留现场（PRD §4.1.6，评审 P3）。
+   * 未保存内容先保存（**全部标签**，非仅活动——修复 P1：原实现只保存活动标签，
+   * 非活动脏标签会被 editor.close() 静默丢弃）；遇外部改动需用户确认覆盖（同设置页语义）。
+   * 保存失败则中止切换、保留现场（PRD §4.1.6，评审 P3）。
    * 成功激活后清空并收起目录树，重新展开时加载新工作区内容（不残留旧数据，评审 P2）。
    */
   async function switchWorkspace(absPath) {
-    if (editor.dirty) {
-      const r = await editor.save()
-      if (!r.ok) return r // 中止切换，error 已由 store 置入，主区显示
+    const r = await editor.saveAll()
+    if (r.externalChange) {
+      setSwitchConfirm(absPath) // 有标签磁盘被外部修改：需确认覆盖后再切换
+      return r
     }
+    if (!r.ok) return r // 保存失败：中止切换，error 已由 store 置入，主区显示
+    return doSwitch(absPath)
+  }
+
+  /** 确认覆盖外部改动后切换（P1：saveAll(true) 失败同样中止） */
+  async function handleSwitchOverwrite() {
+    const absPath = switchConfirm
+    setSwitchConfirm(null)
+    const r = await editor.saveAll(true) // 用户已确认：强制覆盖（跳过检测）
+    if (!r.ok) return r // 覆盖保存失败：中止切换
+    return doSwitch(absPath)
+  }
+
+  /** 实际切换：取消激活当前（清空 fs 边界）→ 激活新路径 → 关闭全部标签 */
+  async function doSwitch(absPath) {
     await workspace.deactivate()
     const res = await workspace.activate(absPath)
     editor.close()
@@ -411,7 +425,7 @@ export default function Sidebar({
     const newName = rawName.trim().replace(/[/\\]/g, '-')
     if (!newName) return // 空名：保留默认名
     const parentRelPath = dirOf(relPath)
-    const oldName = relPath.slice(relPath.lastIndexOf('/') + 1)
+    const oldName = fileNameOf(relPath)
     if (newName === oldName) return // 未改名
     const newRelPath = parentRelPath ? `${parentRelPath}/${newName}` : newName
     let targetExists = false
@@ -720,15 +734,16 @@ export default function Sidebar({
           type="button"
           className={`sidebar__tree-toggle${listOpen ? ' sidebar__tree-toggle--open' : ''}`}
           onClick={toggleList}
-          onContextMenu={(e) =>
+          onContextMenu={(e) => {
+            const termItem = terminalMenuItem(null) // CC-5：开关 + CLI 置灰（仅计算一次）
             openMenu(e, [
               { label: '新建文件', onClick: () => startCreateFile('') },
               { label: '新建文件夹', onClick: () => startCreate('', 'folder') },
-              ...(terminalMenuItem(null) ? [terminalMenuItem(null)] : []), // CC-5：开关 + CLI 置灰
+              ...(termItem ? [termItem] : []),
               { label: '在资源管理器中打开', onClick: () => revealInExplorer(null) },
               { label: '刷新', onClick: () => refreshTree() } // 4.5：感知外部改动
             ])
-          }
+          }}
           aria-expanded={listOpen}
           disabled={workspace.state !== 'active'} // 无工作区时禁用（评审 S3）
           title={
@@ -766,7 +781,8 @@ export default function Sidebar({
                 editor={editor}
                 onToggle={toggleFolder}
                 onArrowToggle={toggleFolderRecursive}
-                onContextMenu={(e, node) =>
+                onContextMenu={(e, node) => {
+                  const termItem = terminalMenuItem(node) // CC-5：开关 + CLI 置灰（仅计算一次）
                   openMenu(
                     e,
                     node.isDir
@@ -779,7 +795,7 @@ export default function Sidebar({
                             label: '新建文件夹',
                             onClick: () => startCreate(node.relPath, 'folder')
                           },
-                          ...(terminalMenuItem(node) ? [terminalMenuItem(node)] : []), // CC-5：开关 + CLI 置灰
+                          ...(termItem ? [termItem] : []),
                           { label: '在资源管理器中打开', onClick: () => revealInExplorer(node) },
                           { label: '重命名', onClick: () => startRename(node) },
                           { label: '删除', danger: true, onClick: () => startDelete(node) },
@@ -792,7 +808,7 @@ export default function Sidebar({
                           { label: '删除', danger: true, onClick: () => startDelete(node) }
                         ]
                   )
-                }
+                }}
                 creating={creating}
                 onSubmitCreate={submitCreate}
                 onCancelCreate={cancelCreate}
@@ -849,6 +865,19 @@ export default function Sidebar({
           confirmLabel="删除"
           onConfirm={confirmDelete}
           onCancel={cancelDelete}
+        />
+      )}
+
+      {/* 切换工作区外部改动覆盖确认（P1：与设置页语义一致，防止静默丢弃未保存内容） */}
+      {switchConfirm && (
+        <ConfirmDialog
+          title="切换工作区"
+          message="有文件已被外部修改，保存被阻止。"
+          warning="强制覆盖将保存当前编辑内容并切换工作区；取消则中止切换。"
+          confirmLabel="强制覆盖并切换"
+          confirmDanger={false}
+          onConfirm={handleSwitchOverwrite}
+          onCancel={() => setSwitchConfirm(null)}
         />
       )}
     </aside>
